@@ -10,6 +10,9 @@
 <!-- docx.js (Word generation, exposes global `docx`) -->
 <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
 
+<!-- ערכת נושא מוקדמת (מונע הבהוב) -->
+<script>try{document.documentElement.setAttribute("data-theme",localStorage.getItem("pka_theme")||"light");}catch(e){}</script>
+
 <style>
   :root{
     --bg:#f4f7fb; --panel:#ffffff; --panel2:#eef3f9; --line:#d3dde9;
@@ -22,10 +25,12 @@
     background:var(--bg); color:var(--txt); line-height:1.55;
   }
   header{
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
     background:linear-gradient(90deg,#ffffff,#eaf2fa);
     border-bottom:3px solid var(--accent); padding:20px 24px;
     box-shadow:0 1px 4px rgba(28,39,51,.06);
   }
+  #themeToggle{white-space:nowrap;}
   header h1{margin:0;font-size:21px;color:#15202d;}
   header p{margin:5px 0 0;color:var(--muted);font-size:13px;}
   .wrap{max-width:1000px;margin:0 auto;padding:20px;}
@@ -86,12 +91,32 @@
   /* --- ימים מפוצלים (#3) --- */
   tr.fullrow td{background:rgba(31,127,196,.10);font-weight:600;}
   .splittag{font-size:11px;color:var(--accent2);margin-inline-start:8px;}
+
+  /* ===== מצב כהה (Dark mode) ===== */
+  [data-theme="dark"]{
+    --bg:#0f1620; --panel:#172230; --panel2:#1f2d3d; --line:#2c3e50;
+    --txt:#e8eef5; --muted:#9fb0c2; --accent:#e88b2e; --accent2:#3a9bdc;
+    --ok:#3fb950; --bad:#e5534b; --field:#0d141d;
+  }
+  [data-theme="dark"] header{background:linear-gradient(90deg,#1d2a3a,#101822);box-shadow:none;}
+  [data-theme="dark"] header h1{color:#e8eef5;}
+  [data-theme="dark"] .card{box-shadow:none;}
+  [data-theme="dark"] .card h2{color:#e8eef5;}
+  [data-theme="dark"] .dayhead{color:#e8eef5;}
+  [data-theme="dark"] table{background:transparent;}
+  [data-theme="dark"] th{background:#13202d;color:#9fb0c2;}
+  [data-theme="dark"] tbody tr:nth-child(even) td{background:rgba(255,255,255,.025);}
+  [data-theme="dark"] code{background:#0a1019;color:#e88b2e;}
+  [data-theme="dark"] .reviewbar{color:#e88b2e;}
 </style>
 </head>
 <body>
 <header>
-  <h1>מחולל פק"א — חיבור אוטומטי לגוגל קלנדר</h1>
-  <p>בא"פ מרכז 8222 · ביה"ס ללחימה · צוות מרכזי — מושך אירועי שבוע אימון מהיומן ומייצא פק"א בפורמט.</p>
+  <div>
+    <h1>מחולל פק"א — חיבור אוטומטי לגוגל קלנדר</h1>
+    <p>בא"פ מרכז 8222 · ביה"ס ללחימה · צוות מרכזי — מושך אירועי שבוע אימון מהיומן ומייצא פק"א בפורמט.</p>
+  </div>
+  <button id="themeToggle" class="ghost" type="button" aria-label="החלף ערכת נושא">🌙 מצב כהה</button>
 </header>
 
 <div class="wrap">
@@ -115,6 +140,11 @@
       <div>
         <label>יומן (קלנדר)</label>
         <select id="calendarSel"><option>— התחבר תחילה —</option></select>
+      </div>
+      <div>
+        <label>או מזהה יומן ידני (אימייל)</label>
+        <input id="calendarManual" placeholder="baf8222merkaz@gmail.com" />
+        <div class="hint">אם היומן הרצוי לא מופיע ברשימה — הדבק כאן את כתובת היומן. שדה זה גובר על הבחירה למעלה.</div>
       </div>
       <div>
         <label>מספר גדוד</label>
@@ -189,7 +219,7 @@
   <div class="card">
     <h2>5 · ייצוא פק"א</h2>
     <div class="row">
-      <button id="exportBtn" disabled>צור והורד פק"א (Word)</button>
+      <button id="exportBtn">צור והורד פק"א (Word)</button>
       <span id="exportState" class="statusbar"></span>
     </div>
     <div class="hint">ניתן גם לייצא ללא חיבור ליומן — לחיצה על "צור והורד" תפיק תבנית ריקה בפורמט.</div>
@@ -223,6 +253,19 @@ const SCOPES = "https://www.googleapis.com/auth/calendar.readonly";
 let accessToken = null;
 let tokenClient = null;
 let parsedDays = [];   // [{date, label, events:[{start,end,summary,location,giver,notes,prof}]}]
+
+/* ---------- מצב בהיר/כהה ---------- */
+const THEME_KEY = "pka_theme";
+function applyTheme(t){
+  document.documentElement.setAttribute("data-theme", t);
+  $("themeToggle").textContent = t==="dark" ? "☀️ מצב בהיר" : "🌙 מצב כהה";
+}
+applyTheme(localStorage.getItem(THEME_KEY) || "light");
+$("themeToggle").addEventListener("click", () => {
+  const next = document.documentElement.getAttribute("data-theme")==="dark" ? "light" : "dark";
+  localStorage.setItem(THEME_KEY, next);
+  applyTheme(next);
+});
 
 /* שמירת Client ID מקומית */
 $("clientId").value = localStorage.getItem("pka_client_id") || "";
@@ -327,25 +370,38 @@ async function gcal(path){
 }
 
 async function loadCalendars(){
+  const sel = $("calendarSel");
+  sel.innerHTML="<option>— טוען יומנים… —</option>";
   try{
     const data = await gcal("users/me/calendarList?maxResults=250");
-    const sel = $("calendarSel"); sel.innerHTML="";
-    (data.items||[]).sort((a,b)=> (b.primary?1:0)-(a.primary?1:0))
-      .forEach(c=>{
-        const o=document.createElement("option");
-        o.value=c.id; o.textContent=c.summary + (c.primary?" (ראשי)":"");
-        sel.appendChild(o);
-      });
-  }catch(e){ $("fetchState").textContent="לא ניתן לטעון יומנים: "+e.message; }
+    const items = (data.items||[]).sort((a,b)=> (b.primary?1:0)-(a.primary?1:0));
+    sel.innerHTML="";
+    if(!items.length){
+      sel.innerHTML="<option>— לא נמצאו יומנים —</option>";
+      $("fetchState").textContent="לא נמצאו יומנים בחשבון. ניתן להדביק מזהה יומן ידני.";
+      return;
+    }
+    items.forEach(c=>{
+      const o=document.createElement("option");
+      o.value=c.id; o.textContent=c.summary + (c.primary?" (ראשי)":"");
+      sel.appendChild(o);
+    });
+    $("fetchState").textContent="נטענו "+items.length+" יומנים. בחר יומן ומשוך אירועים.";
+  }catch(e){
+    console.error("loadCalendars failed:", e);
+    sel.innerHTML="<option>— שגיאה בטעינת יומנים —</option>";
+    $("fetchState").textContent="לא ניתן לטעון יומנים: "+e.message+" — ניתן להדביק מזהה יומן ידני ולהמשיך.";
+  }
 }
 
 /* ---------- משיכת אירועים ---------- */
 $("fetchBtn").addEventListener("click", fetchEvents);
 async function fetchEvents(){
-  const calId = $("calendarSel").value;
+  const manual = $("calendarManual").value.trim();
+  const calId = manual || $("calendarSel").value;
   const startStr = $("startDate").value;
   const nDays = parseInt($("numDays").value||"5",10);
-  if(!calId || calId.startsWith("—")){ alert("בחר יומן."); return; }
+  if(!calId || calId.startsWith("—")){ alert("בחר יומן מהרשימה או הדבק מזהה יומן ידני."); return; }
   if(!startStr){ alert("בחר תאריך תחילת אימון."); return; }
 
   const start = new Date(startStr+"T00:00:00");
