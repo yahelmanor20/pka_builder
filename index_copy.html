@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>מחולל פק"א מגוגל קלנדר — צוות מרכזי</title>
+
+<!-- Google Identity Services (OAuth) -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<!-- docx.js (Word generation, exposes global `docx`) -->
+<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+
+<style>
+  :root{
+    --bg:#0f1620; --panel:#172230; --panel2:#1f2d3d; --line:#2c3e50;
+    --txt:#e8eef5; --muted:#9fb0c2; --accent:#e88b2e; --accent2:#3a9bdc;
+    --ok:#3fb950; --bad:#e5534b; --field:#0d141d;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:"Segoe UI",Arial,"David",sans-serif;
+    background:var(--bg); color:var(--txt); line-height:1.5;
+  }
+  header{
+    background:linear-gradient(90deg,#1d2a3a,#101822);
+    border-bottom:3px solid var(--accent); padding:18px 22px;
+  }
+  header h1{margin:0;font-size:20px;}
+  header p{margin:4px 0 0;color:var(--muted);font-size:13px;}
+  .wrap{max-width:1000px;margin:0 auto;padding:18px;}
+  .card{
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:12px; padding:18px; margin-bottom:16px;
+  }
+  .card h2{margin:0 0 12px;font-size:16px;border-right:4px solid var(--accent);padding-right:10px;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media(max-width:640px){.grid{grid-template-columns:1fr;}}
+  label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px;}
+  input,select,textarea{
+    width:100%;background:var(--field);color:var(--txt);
+    border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:14px;
+    font-family:inherit;
+  }
+  textarea{resize:vertical;min-height:74px;}
+  button{
+    background:var(--accent);color:#1a1207;border:none;border-radius:8px;
+    padding:11px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;
+  }
+  button.sec{background:var(--accent2);color:#06121c;}
+  button.ghost{background:transparent;color:var(--txt);border:1px solid var(--line);font-weight:500;}
+  button:disabled{opacity:.45;cursor:not-allowed;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .pill{font-size:12px;padding:3px 10px;border-radius:20px;background:var(--panel2);color:var(--muted);}
+  .pill.ok{background:rgba(63,185,80,.15);color:var(--ok);}
+  .pill.bad{background:rgba(229,83,75,.15);color:var(--bad);}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px;}
+  .daybox{border:1px solid var(--line);border-radius:10px;margin:10px 0;overflow:hidden;}
+  .dayhead{background:var(--panel2);padding:8px 12px;font-weight:700;font-size:14px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{border:1px solid var(--line);padding:6px 8px;text-align:right;vertical-align:top;}
+  th{background:#13202d;color:var(--muted);font-weight:600;}
+  .small{font-size:12px;}
+  details summary{cursor:pointer;color:var(--accent2);font-size:13px;margin-bottom:8px;}
+  .steps{counter-reset:s;padding:0;margin:0;list-style:none;}
+  .steps li{counter-increment:s;position:relative;padding:4px 30px 4px 0;font-size:13px;color:var(--muted);}
+  .steps li::before{content:counter(s);position:absolute;right:0;top:3px;width:20px;height:20px;
+    background:var(--accent);color:#1a1207;border-radius:50%;text-align:center;font-size:12px;font-weight:700;line-height:20px;}
+  code{background:#0a1019;padding:1px 6px;border-radius:5px;color:var(--accent);font-size:12px;}
+  .statusbar{font-size:13px;color:var(--muted);min-height:18px;}
+  /* --- סימון אי-ודאות (#2) --- */
+  .reviewbar{background:rgba(232,139,46,.12);border:1px solid rgba(232,139,46,.4);
+    border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:13px;color:var(--accent);font-weight:600;}
+  .reviewbar.clean{background:rgba(63,185,80,.10);border-color:rgba(63,185,80,.35);color:var(--ok);}
+  tr.warn td{background:rgba(232,139,46,.12);}
+  td.miss{color:var(--bad);font-weight:600;}
+  .badge{display:inline-block;font-size:11px;color:var(--bad);
+    border:1px solid rgba(229,83,75,.45);border-radius:10px;padding:0 7px;margin-inline-start:6px;white-space:nowrap;}
+  /* --- ימים מפוצלים (#3) --- */
+  tr.fullrow td{background:rgba(58,155,220,.12);font-weight:600;}
+  .splittag{font-size:11px;color:var(--accent2);margin-inline-start:8px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>מחולל פק"א — חיבור אוטומטי לגוגל קלנדר</h1>
+  <p>בא"פ מרכז 8222 · ביה"ס ללחימה · צוות מרכזי — מושך אירועי שבוע אימון מהיומן ומייצא פק"א בפורמט.</p>
+</header>
+
+<div class="wrap">
+
+  <!-- ===== חיבור ===== -->
+  <div class="card">
+    <h2>1 · חיבור לגוגל קלנדר</h2>
+    <label>Google OAuth Client ID</label>
+    <input id="clientId" placeholder="xxxxxxxx.apps.googleusercontent.com" />
+    <div class="hint">מזהה חד-פעמי שמפיקים בקונסולת Google Cloud. נשמר מקומית בדפדפן בלבד. הסבר מלא בתחתית העמוד.</div>
+    <div class="row" style="margin-top:12px">
+      <button id="connectBtn">התחבר לחשבון Google</button>
+      <span id="authState" class="pill bad">לא מחובר</span>
+    </div>
+  </div>
+
+  <!-- ===== בחירת שבוע ===== -->
+  <div class="card">
+    <h2>2 · בחירת היומן והשבוע</h2>
+    <div class="grid">
+      <div>
+        <label>יומן (קלנדר)</label>
+        <select id="calendarSel"><option>— התחבר תחילה —</option></select>
+      </div>
+      <div>
+        <label>מספר גדוד</label>
+        <input id="battalion" placeholder="למשל 8109" />
+      </div>
+      <div>
+        <label>תאריך תחילת האימון (יום א')</label>
+        <input id="startDate" type="date" />
+      </div>
+      <div>
+        <label>מספר ימי אימון</label>
+        <input id="numDays" type="number" min="1" max="14" value="5" />
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button id="fetchBtn" class="sec" disabled>משוך אירועים מהיומן</button>
+      <span id="fetchState" class="statusbar"></span>
+    </div>
+  </div>
+
+  <!-- ===== פרטי הפק"א ===== -->
+  <div class="card">
+    <h2>3 · פרטי הפק"א (ניתן לערוך)</h2>
+    <label>נושא הפק"א (הנידון)</label>
+    <input id="subject" value='פק"א - אימון עד לרמת תרג"ד רטוב' />
+    <div class="grid" style="margin-top:10px">
+      <div>
+        <label>תאריך הפצה</label>
+        <input id="issueDate" type="date" />
+      </div>
+      <div>
+        <label>חותם</label>
+        <input id="signer" value="יהל מנור, סגן — מפקד צוות מרכזי" />
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <label>כללי</label>
+      <textarea id="secGeneral">כל פעם שמסומן הלו"ז בכתום – זהו לו"ז מקביל ויש להתייחס אליו במלוא תשומת הלב.
+בשבוע מתבצעים מטווחים, תרמ"חים יבשים ש"פ, תרפ"לים רטובים ש"פ, תרג"ד ש"ב עם ערכות מגנ"ט ותרג"ד ש"פ רטוב.</textarea>
+    </div>
+    <div style="margin-top:10px">
+      <label>הנחות יסוד</label>
+      <textarea id="secAssump">ביצוע תרגילים יבשים ורטובים.
+תרגול ע"פ פקודות בטיחות.
+המפקד המאמן – מפקדים מעבירים את רוב השבוע. אימון מפקדים איכותי = אימון איכותי.
+מעורבות החטמ"ר בכל הקשור לאימון במעטפת, תנאי לביצוע האימון.</textarea>
+    </div>
+    <div style="margin-top:10px">
+      <label>גורמים משפיעים</label>
+      <textarea id="secFactors">עונת החורף – באחריות הגדוד לספק חלפ"ס לכל לוחם וציוד מספק לקור. פק"לי חום בכוננות למקרה של מכת קור.
+ייתכנו גדודים נוספים מתאמנים במקביל בבא"פ.</textarea>
+    </div>
+    <div style="margin-top:10px">
+      <label>מטרת האימון</label>
+      <textarea id="secGoal">הגדוד יבצע אימון מוכוון לתרחיש האופרטיבי שלו, יחזק את כשירותו ומוכנותו לתרחיש קיצון, ויתמחה בשימוש בפק"לים ושילובם בלחימה.</textarea>
+    </div>
+    <div style="margin-top:10px">
+      <label>הישגים נדרשים</label>
+      <textarea id="secAchiev">מעבר כלל התכנים המחייבים ע"י כל מפקדי וחיילי הגדוד.
+שליטה בנשק ובאמל"ח המשמש את הגדוד.
+ביצוע איכותי וכמותי מלא של כלל ההסמכות והרענונים הנדרשים.</textarea>
+    </div>
+  </div>
+
+  <!-- ===== תצוגה מקדימה ===== -->
+  <div class="card">
+    <h2>4 · תצוגה מקדימה של הלו"ז</h2>
+    <div id="preview"><span class="hint">לאחר משיכת האירועים יוצג כאן הלו"ז המפורט לפי ימים.</span></div>
+  </div>
+
+  <!-- ===== ייצוא ===== -->
+  <div class="card">
+    <h2>5 · ייצוא פק"א</h2>
+    <div class="row">
+      <button id="exportBtn" disabled>צור והורד פק"א (Word)</button>
+      <span id="exportState" class="statusbar"></span>
+    </div>
+    <div class="hint">ניתן גם לייצא ללא חיבור ליומן — לחיצה על "צור והורד" תפיק תבנית ריקה בפורמט.</div>
+  </div>
+
+  <!-- ===== הגדרה ===== -->
+  <div class="card">
+    <h2>הגדרת חיבור Google (חד-פעמי)</h2>
+    <ol class="steps">
+      <li>היכנס ל-<code>console.cloud.google.com</code> וצור פרויקט.</li>
+      <li>ב-APIs &amp; Services → Library, הפעל את <code>Google Calendar API</code>.</li>
+      <li>ב-OAuth consent screen הגדר אפליקציה (External) והוסף את עצמך כ-Test user.</li>
+      <li>ב-Credentials → Create credentials → OAuth client ID → סוג <code>Web application</code>.</li>
+      <li>תחת Authorized JavaScript origins הוסף את הכתובת שבה רץ הקובץ (למשל <code>http://localhost:8000</code> או דומיין הארגון).</li>
+      <li>העתק את ה-Client ID והדבק בשדה למעלה.</li>
+    </ol>
+    <div class="hint">החיבור דורש הרשאת קריאה בלבד ליומן (<code>calendar.readonly</code>). שום מידע אינו נשלח לשרת חיצוני — הכול רץ בדפדפן.</div>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+
+/* ---------- כלי עזר ---------- */
+const $ = id => document.getElementById(id);
+const HE_DAYS = ["יום א'","יום ב'","יום ג'","יום ד'","יום ה'","יום ו'","שבת"];
+const UNKNOWN_LOC = "מיקום לא ידוע";
+const SCOPES = "https://www.googleapis.com/auth/calendar.readonly";
+
+let accessToken = null;
+let tokenClient = null;
+let parsedDays = [];   // [{date, label, events:[{start,end,summary,location,giver,notes,prof}]}]
+
+/* שמירת Client ID מקומית */
+$("clientId").value = localStorage.getItem("pka_client_id") || "";
+$("clientId").addEventListener("change", e => localStorage.setItem("pka_client_id", e.target.value.trim()));
+
+/* ברירת מחדל לתאריכים */
+(function(){
+  const t = new Date();
+  $("issueDate").valueAsDate = t;
+})();
+
+/* ---------- מיפוי מקצוע לפי מילות מפתח ---------- */
+const PROF_MAP = [
+  ["קלעים","קלעים"],["נגב","נגב"],["מאג","מאג"],["מטול","מטול"],["לאו","לאו"],
+  ["צלפ","צלפים"],["אלפ","אלפ\"ה"],["אלפה","אלפ\"ה"],
+  ["מטווח","מטווחים"],["מטוו","מטווחים"],
+  ["סימולטור","סימולטור"],["תקשוב","תקשוב"],["קשר","תקשוב"],["ליונט","תקשוב"],
+  ["רפוא","רפואה"],["חובש","רפואה"],["תאג\"ד","רפואה"],["מט\"ב","רפואה"],
+  ["מזון","מזון"],["משיכ","מזון"],["חד\"א","מזון"],["א.ב","מזון"],["א.צ","מזון"],["א.ע","מזון"],
+  ["מגנ","מגנ\"ט"],["טיולי","הובלות"],["הובל","הובלות"],
+  ["שטח אש","שטחי אש"],["ש.א","שטחי אש"],["שטחי","שטחי אש"],
+  ["כיתה","כיתות"],["כיתת","כיתות"],
+  ["תחמושת","תחמושת"],["רחפן","רחפנים"]
+];
+function detectProf(text){
+  const t = (text||"");
+  for(const [k,v] of PROF_MAP){ if(t.indexOf(k)>=0) return v; }
+  return "כללי";
+}
+
+/* ---------- זיהוי פעילות פלוגתית (#3) ---------- */
+/* מזהה כותרות מסוג: "פלוגה א' - <פעילות>", "פלוגה ב – ...", "פלוגה ג: ..." */
+const PL_ORDER = ["א","ב","ג","ד"];
+function detectPlatoon(summary){
+  const m = (summary||"").match(/פלוגה\s*([א-ד])(?:'|׳)?(?:\s*[-–—:]\s*|\s+)(.+)/);
+  if(m) return {letter:m[1], activity:m[2].trim()};
+  return null;
+}
+
+/* ---------- חישוב אי-ודאות לפעילות (#2) ---------- */
+/* מחזיר רשימת שדות חסרים/לא ודאיים. שינוי קל כאן משנה מה נצבע בצהוב. */
+function computeIssues(e){
+  const out=[];
+  if(!e.start)                  out.push("ללא שעה");
+  if(e.location===UNKNOWN_LOC)  out.push("מיקום לא ידוע");
+  if(!e.giver)                  out.push("חסר גורם מעביר");
+  return out;
+}
+
+/* ---------- פירוק תיאור אירוע לשדות מובנים ---------- */
+/* תומך בשורות מסוג "גורם: ...", "מעביר: ...", "הערות: ...", "מיקום: ..." */
+function parseDescription(desc){
+  const out = {giver:"", notes:""};
+  if(!desc) return out;
+  const lines = desc.split(/\r?\n/);
+  const leftover = [];
+  for(const ln of lines){
+    const m = ln.match(/^\s*(גורם מעביר|גורם|מעביר|הערות|הערה|מיקום)\s*[:：-]\s*(.+)$/);
+    if(m){
+      const key=m[1], val=m[2].trim();
+      if(/גורם|מעביר/.test(key)) out.giver = val;
+      else if(/הער/.test(key)) out.notes = val;
+      else if(/מיקום/.test(key)) out.locOverride = val;
+    } else if(ln.trim()){ leftover.push(ln.trim()); }
+  }
+  if(!out.notes && leftover.length) out.notes = leftover.join(" · ");
+  return out;
+}
+
+/* ---------- חיבור OAuth ---------- */
+$("connectBtn").addEventListener("click", () => {
+  const cid = $("clientId").value.trim();
+  if(!cid){ alert("יש להזין Google OAuth Client ID."); return; }
+  if(typeof google === "undefined" || !google.accounts){
+    alert("ספריית Google עדיין נטענת — נסה שוב בעוד רגע."); return;
+  }
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: cid,
+    scope: SCOPES,
+    callback: (resp) => {
+      if(resp.error){ setAuth(false, resp.error); return; }
+      accessToken = resp.access_token;
+      setAuth(true);
+      loadCalendars();
+    }
+  });
+  tokenClient.requestAccessToken({prompt:"consent"});
+});
+
+function setAuth(ok, err){
+  const el = $("authState");
+  if(ok){ el.textContent="מחובר ✓"; el.className="pill ok"; $("fetchBtn").disabled=false; }
+  else  { el.textContent= err?("שגיאה: "+err):"לא מחובר"; el.className="pill bad"; $("fetchBtn").disabled=true; }
+}
+
+async function gcal(path){
+  const r = await fetch("https://www.googleapis.com/calendar/v3/"+path, {
+    headers:{ Authorization:"Bearer "+accessToken }
+  });
+  if(!r.ok) throw new Error("Calendar API "+r.status);
+  return r.json();
+}
+
+async function loadCalendars(){
+  try{
+    const data = await gcal("users/me/calendarList?maxResults=250");
+    const sel = $("calendarSel"); sel.innerHTML="";
+    (data.items||[]).sort((a,b)=> (b.primary?1:0)-(a.primary?1:0))
+      .forEach(c=>{
+        const o=document.createElement("option");
+        o.value=c.id; o.textContent=c.summary + (c.primary?" (ראשי)":"");
+        sel.appendChild(o);
+      });
+  }catch(e){ $("fetchState").textContent="לא ניתן לטעון יומנים: "+e.message; }
+}
+
+/* ---------- משיכת אירועים ---------- */
+$("fetchBtn").addEventListener("click", fetchEvents);
+async function fetchEvents(){
+  const calId = $("calendarSel").value;
+  const startStr = $("startDate").value;
+  const nDays = parseInt($("numDays").value||"5",10);
+  if(!calId || calId.startsWith("—")){ alert("בחר יומן."); return; }
+  if(!startStr){ alert("בחר תאריך תחילת אימון."); return; }
+
+  const start = new Date(startStr+"T00:00:00");
+  const end = new Date(start); end.setDate(end.getDate()+nDays);
+  $("fetchState").textContent="מושך אירועים…";
+
+  try{
+    let items=[], pageToken=null;
+    do{
+      const q = new URLSearchParams({
+        timeMin:start.toISOString(), timeMax:end.toISOString(),
+        singleEvents:"true", orderBy:"startTime", maxResults:"2500"
+      });
+      if(pageToken) q.set("pageToken",pageToken);
+      const data = await gcal("calendars/"+encodeURIComponent(calId)+"/events?"+q.toString());
+      items = items.concat(data.items||[]);
+      pageToken = data.nextPageToken;
+    } while(pageToken);
+
+    buildDays(items, start, nDays);
+    renderPreview();
+    $("exportBtn").disabled=false;
+    $("fetchState").textContent = "נמצאו "+items.length+" אירועים.";
+  }catch(e){ $("fetchState").textContent="שגיאה: "+e.message; }
+}
+
+function fmtTime(iso, allDay){
+  if(allDay) return "";
+  const d = new Date(iso);
+  return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+}
+
+function buildDays(items, start, nDays){
+  parsedDays = [];
+  for(let i=0;i<nDays;i++){
+    const d = new Date(start); d.setDate(d.getDate()+i);
+    const dd = String(d.getDate()).padStart(2,"0");
+    const mm = String(d.getMonth()+1).padStart(2,"0");
+    parsedDays.push({date:d, label:HE_DAYS[d.getDay()]+" "+dd+"/"+mm, events:[]});
+  }
+  for(const ev of items){
+    const allDay = !!(ev.start && ev.start.date);
+    const sIso = ev.start.dateTime || (ev.start.date+"T00:00:00");
+    const sd = new Date(sIso);
+    const idx = parsedDays.findIndex(p =>
+      p.date.getFullYear()===sd.getFullYear() &&
+      p.date.getMonth()===sd.getMonth() &&
+      p.date.getDate()===sd.getDate());
+    if(idx<0) continue;
+    const meta = parseDescription(ev.description);
+    const summary = (ev.summary||"ללא כותרת").trim();
+    const pl = detectPlatoon(summary);
+    const obj = {
+      start: fmtTime(sIso, allDay),
+      end: fmtTime(ev.end && (ev.end.dateTime||ev.end.date)+"T00:00:00", allDay),
+      summary: summary,
+      cleanSummary: pl ? pl.activity : summary,
+      platoon: pl ? pl.letter : null,
+      location: (ev.location||meta.locOverride||"").trim() || UNKNOWN_LOC,
+      giver: meta.giver||"",
+      notes: meta.notes||"",
+      prof: detectProf(summary+" "+(ev.description||""))
+    };
+    obj.issues = computeIssues(obj);
+    parsedDays[idx].events.push(obj);
+  }
+  parsedDays.forEach(p=>{
+    p.events.sort((a,b)=> (a.start||"").localeCompare(b.start||""));
+    const letters = [...new Set(p.events.filter(e=>e.platoon).map(e=>e.platoon))]
+                      .sort((a,b)=> PL_ORDER.indexOf(a)-PL_ORDER.indexOf(b));
+    p.platoons = letters;
+    p.isSplit  = letters.length >= 2;   // יום מפוצל = שתי פלוגות ומעלה
+  });
+}
+
+/* ---------- בניית גריד ליום מפוצל (#3) ---------- */
+/* מחזיר שורות מסודרות: שורת-על לכל הגדוד (full) או שורת פלוגות (platoon) */
+function buildSplitGrid(day){
+  const plats = day.platoons;
+  const platEvents = day.events.filter(e=>e.platoon);
+  const batEvents  = day.events.filter(e=>!e.platoon);
+  const times = [...new Set(day.events.map(e=>e.start||""))]
+                 .sort((a,b)=> a===""?1 : b===""?-1 : a.localeCompare(b));
+  const rows=[];
+  for(const t of times){
+    batEvents.filter(e=>(e.start||"")===t).forEach(e=> rows.push({type:"full", time:t, ev:e}));
+    const pe = platEvents.filter(e=>(e.start||"")===t);
+    if(pe.length){
+      const cells={};
+      for(const L of plats) cells[L] = pe.filter(e=>e.platoon===L);
+      rows.push({type:"platoon", time:t, cells});
+    }
+  }
+  return rows;
+}
+/* טקסט תצוגה לפעילות: פעילות נקייה + מיקום אם ידוע */
+function evText(e){
+  let s = e.platoon ? e.cleanSummary : e.summary;
+  if(e.location && e.location!==UNKNOWN_LOC) s += " — " + e.location;
+  return s;
+}
+function badgeHtml(e){
+  return e.issues && e.issues.length ? `<span class="badge">⚠ ${esc(e.issues.join(" · "))}</span>` : "";
+}
+
+/* ---------- תצוגה מקדימה ---------- */
+function renderPreview(){
+  const host = $("preview");
+  if(!parsedDays.some(d=>d.events.length)){ host.innerHTML='<span class="hint">לא נמצאו אירועים בטווח שנבחר.</span>'; return; }
+  host.innerHTML="";
+
+  /* מונה אי-ודאות גלובלי */
+  let flagged=0; parsedDays.forEach(d=>d.events.forEach(e=>{ if(e.issues.length) flagged++; }));
+  const bar=document.createElement("div");
+  if(flagged){ bar.className="reviewbar"; bar.textContent=`⚠ ${flagged} פעילויות דורשות בדיקה ידנית (שעה / מיקום / גורם מעביר חסרים) — מסומנות בצהוב.`; }
+  else       { bar.className="reviewbar clean"; bar.textContent="✓ כל הפעילויות זוהו במלואן."; }
+  host.appendChild(bar);
+
+  for(const day of parsedDays){
+    const box=document.createElement("div"); box.className="daybox";
+    const head=document.createElement("div"); head.className="dayhead";
+    head.innerHTML = esc(day.label)+" — "+day.events.length+" פעילויות" +
+      (day.isSplit ? `<span class="splittag">⇆ יום מפוצל (${day.platoons.map(l=>"פלוגה "+l+"'").join(", ")})</span>` : "");
+    box.appendChild(head);
+    if(day.events.length){
+      box.appendChild(day.isSplit ? renderSplitTable(day) : renderFlatTable(day));
+    }
+    host.appendChild(box);
+  }
+}
+
+/* טבלה רגילה (יום לא מפוצל) — עם סימון שדות חסרים */
+function renderFlatTable(day){
+  const tbl=document.createElement("table");
+  tbl.innerHTML="<tr><th>הערות</th><th>גורם מעביר</th><th>מיקום</th><th>פעילות</th><th>התחלה</th><th>סיום</th></tr>";
+  for(const e of day.events){
+    const tr=document.createElement("tr");
+    if(e.issues.length) tr.className="warn";
+    const locCls = e.location===UNKNOWN_LOC ? ' class="miss"' : "";
+    const givCls = !e.giver ? ' class="miss"' : "";
+    const timCls = !e.start ? ' class="miss"' : "";
+    tr.innerHTML =
+      `<td>${esc(e.notes)}${badgeHtml(e)}</td>`+
+      `<td${givCls}>${esc(e.giver||"—")}</td>`+
+      `<td${locCls}>${esc(e.location)}</td>`+
+      `<td>${esc(e.cleanSummary)}</td>`+
+      `<td${timCls}>${esc(e.start||"—")}</td>`+
+      `<td>${esc(e.end)}</td>`;
+    tbl.appendChild(tr);
+  }
+  return tbl;
+}
+
+/* טבלת פלוגות (יום מפוצל) — שעה → פלוגה א' → ב' → ג' */
+function renderSplitTable(day){
+  const plats=day.platoons, grid=buildSplitGrid(day);
+  const tbl=document.createElement("table");
+  let thead="<tr><th>שעה</th>"+plats.map(l=>`<th>פלוגה ${esc(l)}'</th>`).join("")+"</tr>";
+  tbl.innerHTML=thead;
+  for(const r of grid){
+    const tr=document.createElement("tr");
+    if(r.type==="full"){
+      if(r.ev.issues.length) tr.className="warn";
+      tr.classList.add("fullrow");
+      tr.innerHTML=`<td>${esc(r.time||"—")}</td><td colspan="${plats.length}">${esc(evText(r.ev))}${badgeHtml(r.ev)}</td>`;
+    } else {
+      let warn=false, cells="";
+      for(const L of plats){
+        const arr=r.cells[L]||[];
+        if(arr.some(e=>e.issues.length)) warn=true;
+        cells += `<td>${arr.map(e=>esc(evText(e))+badgeHtml(e)).join("<br>") || "—"}</td>`;
+      }
+      if(warn) tr.className="warn";
+      tr.innerHTML=`<td>${esc(r.time||"—")}</td>`+cells;
+    }
+    tbl.appendChild(tr);
+  }
+  return tbl;
+}
+function esc(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+
+/* ---------- בניית טבלת דרישות לפי מקצוע ---------- */
+function buildRequirementMatrix(){
+  const profs = ["מזון","תקשוב","רפואה","מטווחים","שטחי אש","סימולטור","הובלות","כיתות","מגנ\"ט","תחמושת","קלעים","נגב","מאג","מטול","לאו","רחפנים"];
+  const matrix = {};
+  for(const day of parsedDays){
+    for(const e of day.events){
+      if(!matrix[e.prof]) matrix[e.prof]={};
+      const cell = matrix[e.prof][day.label] || "";
+      const piece = (e.start?e.start:"") + (e.end?("–"+e.end):"") + " " + e.summary + (e.location&&e.location!==UNKNOWN_LOC?(" ("+e.location+")"):"");
+      matrix[e.prof][day.label] = cell ? cell+"\n"+piece : piece;
+    }
+  }
+  const used = profs.filter(p=>matrix[p]);
+  // הוסף מקצועות שלא ברשימה אך הופיעו
+  Object.keys(matrix).forEach(p=>{ if(!used.includes(p) && p!=="כללי") used.push(p); });
+  return {rows:used, matrix};
+}
+
+/* ---------- חלוקת בוקר/צהריים/ערב ל"לו"ז עקרוני" ---------- */
+function bucketByPart(events){
+  const b={"בוקר":[],"צהריים":[],"ערב":[]};
+  for(const e of events){
+    const h = parseInt((e.start||"00").split(":")[0],10);
+    const part = h<12?"בוקר": h<18?"צהריים":"ערב";
+    b[part].push(e.summary);
+  }
+  return b;
+}
+
+/* ====================================================== */
+/* ===============  יצירת מסמך Word (docx)  ============== */
+/* ====================================================== */
+$("exportBtn").addEventListener("click", exportDocx);
+
+async function exportDocx(){
+  if(typeof docx==="undefined"){ alert("ספריית יצירת ה-Word עדיין נטענת, נסה שוב."); return; }
+  $("exportState").textContent="בונה מסמך…";
+  const D = docx;
+  const FONT="Arial";
+  const WARN="FFF2CC";   // צהוב בהיר לשדות חסרים/לא ודאיים (#2)
+
+  /* helpers */
+  const rtl = (text, opt={}) => new D.TextRun({text, rightToLeft:true, font:FONT, ...opt});
+  const P = (children, opt={}) => new D.Paragraph({bidirectional:true, alignment:D.AlignmentType.RIGHT, children:Array.isArray(children)?children:[children], ...opt});
+  const heading = (t) => new D.Paragraph({
+    bidirectional:true, alignment:D.AlignmentType.RIGHT, spacing:{before:200,after:80},
+    children:[rtl(t,{bold:true,size:26,underline:{}})]
+  });
+  const bullet = (t) => new D.Paragraph({
+    bidirectional:true, alignment:D.AlignmentType.RIGHT, bullet:{level:0},
+    children:[rtl(t,{size:22})]
+  });
+  const textLines = (s) => (s||"").split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+
+  function cell(text, {bold=false, shade=null, w=null, span=null}={}){
+    return new D.TableCell({
+      columnSpan: span||undefined,
+      width: w?{size:w,type:D.WidthType.DXA}:undefined,
+      shading: shade?{fill:shade,type:D.ShadingType.CLEAR}:undefined,
+      margins:{top:40,bottom:40,left:80,right:80},
+      children: textLines(text).length
+        ? textLines(text).map(line=>P(rtl(line,{bold,size:18})))
+        : [P(rtl("",{size:18}))]
+    });
+  }
+  function tableRow(cells){ return new D.TableRow({children:cells}); }
+  function makeTable(rows, colWidths){
+    return new D.Table({
+      visuallyRightToLeft:true,
+      width:{size:colWidths.reduce((a,b)=>a+b,0),type:D.WidthType.DXA},
+      columnWidths:colWidths,
+      rows
+    });
+  }
+
+  const children=[];
+
+  /* ---- כותרת ---- */
+  children.push(P(rtl("-שמור-",{bold:true,size:20}), {alignment:D.AlignmentType.CENTER}));
+  children.push(P(rtl('בא"פ מרכז 8222',{size:20})));
+  children.push(P(rtl('ביה"ס ללחימה',{size:20})));
+  children.push(P(rtl('צוות מרכזי',{size:20,bold:true})));
+  const issued = $("issueDate").value ? new Date($("issueDate").value).toLocaleDateString("he-IL",{day:"numeric",month:"long",year:"numeric"}) : "";
+  children.push(P(rtl(issued,{size:20})));
+  children.push(P(rtl("",{size:8})));
+
+  /* ---- הנידון ---- */
+  const battalion = $("battalion").value.trim() || "____";
+  const subj = $("subject").value.trim()+" לגדוד "+battalion;
+  children.push(P([rtl("הנידון: ",{bold:true,size:24}), rtl(subj,{bold:true,size:24})]));
+  children.push(P(rtl("",{size:8})));
+
+  /* ---- סעיפים טקסטואליים ---- */
+  const sectionsDef = [
+    ["כללי", $("secGeneral").value],
+    ["הנחות יסוד", $("secAssump").value],
+    ["גורמים משפיעים", $("secFactors").value],
+    ["מטרת האימון", $("secGoal").value],
+    ["הישגים נדרשים", $("secAchiev").value],
+  ];
+  for(const [title,body] of sectionsDef){
+    children.push(heading(title));
+    const lines = textLines(body);
+    if(lines.length) lines.forEach(l=>children.push(bullet(l)));
+    else children.push(P(rtl("למלא.",{size:22})));
+  }
+
+  /* ---- טבלת דרישות לפי מקצוע ---- */
+  if(parsedDays.some(d=>d.events.length)){
+    children.push(heading("ריכוז דרישות לפי מקצוע (מתוך היומן)"));
+    const {rows, matrix} = buildRequirementMatrix();
+    const dayLabels = parsedDays.map(d=>d.label);
+    const colCount = dayLabels.length+1;
+    const total = 9360;
+    const firstW = 1400;
+    const dayW = Math.floor((total-firstW)/dayLabels.length);
+    const widths = [firstW, ...dayLabels.map(()=>dayW)];
+    const header = tableRow([cell("מקצוע",{bold:true,shade:"13202D"}), ...dayLabels.map(l=>cell(l,{bold:true,shade:"13202D"}))]);
+    const bodyRows = rows.map(p=>{
+      return tableRow([ cell(p,{bold:true,shade:"1F2D3D"}), ...dayLabels.map(dl=>cell((matrix[p]&&matrix[p][dl])||"")) ]);
+    });
+    children.push(makeTable([header,...bodyRows], widths));
+    children.push(P(rtl("",{size:8})));
+  }
+
+  /* ---- לו"ז עקרוני (מודל בוקר/צהריים/ערב) ---- */
+  if(parsedDays.some(d=>d.events.length)){
+    children.push(heading('לו"ז עקרוני (מודל)'));
+    const dayLabels = parsedDays.map(d=>d.label);
+    const total=9360, firstW=1200;
+    const dayW=Math.floor((total-firstW)/dayLabels.length);
+    const widths=[firstW,...dayLabels.map(()=>dayW)];
+    const header = tableRow([cell("זמן",{bold:true,shade:"13202D"}), ...dayLabels.map(l=>cell(l,{bold:true,shade:"13202D"}))]);
+    const partRows = ["בוקר","צהריים","ערב"].map(part=>{
+      const cells=[cell(part,{bold:true,shade:"1F2D3D"})];
+      for(const day of parsedDays){
+        const b=bucketByPart(day.events);
+        cells.push(cell((b[part]||[]).join("\n")));
+      }
+      return tableRow(cells);
+    });
+    children.push(makeTable([header,...partRows], widths));
+    children.push(P(rtl("",{size:8})));
+  }
+
+  /* ---- נספח א' — לו"ז פרטני ליום ---- */
+  children.push(new D.Paragraph({pageBreakBefore:true, bidirectional:true, alignment:D.AlignmentType.RIGHT, children:[rtl("נספח א' – לו\"ז פרטני לאימון",{bold:true,size:26,underline:{}})]}));
+  const detailWidths=[1700,1500,1500,2860,900,900]; // הערות,גורם,מיקום,פעילות,התחלה,סיום => 9360
+  const HEAD="13202D";
+  for(const day of parsedDays){
+    const splitNote = day.isSplit ? "  (יום מפוצל)" : "";
+    children.push(P(rtl(day.label+splitNote,{bold:true,size:24}), {spacing:{before:160,after:60}}));
+
+    if(day.isSplit){
+      /* --- טבלת פלוגות: שעה → פלוגה א' → ב' → ג' --- */
+      const plats=day.platoons, grid=buildSplitGrid(day), nCol=plats.length;
+      const timeW=1100, colW=Math.floor((9360-timeW)/nCol);
+      const widths=[timeW, ...plats.map(()=>colW)];
+      const hdr=tableRow([ cell("שעה",{bold:true,shade:HEAD}),
+        ...plats.map(L=>cell("פלוגה "+L+"'",{bold:true,shade:HEAD})) ]);
+      const bodyRows = grid.map(r=>{
+        if(r.type==="full"){
+          return tableRow([ cell(r.time,{bold:true}),
+            cell(evText(r.ev),{bold:true, span:nCol, shade:r.ev.issues.length?WARN:null}) ]);
+        }
+        const cells=[cell(r.time,{bold:true})];
+        for(const L of plats){
+          const arr=r.cells[L]||[];
+          cells.push(cell(arr.map(evText).join("\n"), {shade: arr.some(e=>e.issues.length)?WARN:null}));
+        }
+        return tableRow(cells);
+      });
+      children.push(makeTable([hdr,...bodyRows], widths));
+
+    } else {
+      /* --- טבלה רגילה עם צביעת שדות חסרים --- */
+      const hdr = tableRow([
+        cell("הערות",{bold:true,shade:HEAD}), cell("גורם מעביר",{bold:true,shade:HEAD}),
+        cell("מיקום",{bold:true,shade:HEAD}), cell("פעילות",{bold:true,shade:HEAD}),
+        cell("התחלה",{bold:true,shade:HEAD}), cell("סיום",{bold:true,shade:HEAD})
+      ]);
+      const rows = day.events.length ? day.events.map(e=> tableRow([
+        cell(e.notes),
+        cell(e.giver||"—", {shade: !e.giver?WARN:null}),
+        cell(e.location,   {shade: e.location===UNKNOWN_LOC?WARN:null}),
+        cell(e.cleanSummary,{bold:true}),
+        cell(e.start||"—", {shade: !e.start?WARN:null}),
+        cell(e.end)
+      ])) : [ tableRow([cell(""),cell(""),cell(""),cell("— אין פעילויות ביום זה —"),cell(""),cell("")]) ];
+      children.push(makeTable([hdr,...rows], detailWidths));
+    }
+  }
+
+  /* ---- חתימה ---- */
+  children.push(P(rtl("",{size:10})));
+  children.push(P(rtl("בברכה,",{bold:true,size:22})));
+  textLines($("signer").value).forEach(l=>children.push(P(rtl(l,{bold:true,size:22}))));
+
+  /* ---- בניית המסמך ---- */
+  const doc = new D.Document({
+    styles:{ default:{ document:{ run:{font:FONT,size:22} } } },
+    sections:[{
+      properties:{ page:{ size:{width:11906,height:16838}, margin:{top:1000,right:1000,bottom:1000,left:1000} } },
+      children
+    }]
+  });
+
+  try{
+    const blob = await D.Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url; a.download="פקא_גדוד_"+(battalion||"")+".docx";
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    $("exportState").textContent="הפק\"א הופק והורד ✓";
+  }catch(e){ $("exportState").textContent="שגיאה ביצירת הקובץ: "+e.message; }
+}
+</script>
+</body>
+</html>
