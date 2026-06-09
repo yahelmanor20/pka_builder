@@ -365,7 +365,21 @@ async function gcal(path){
   const r = await fetch("https://www.googleapis.com/calendar/v3/"+path, {
     headers:{ Authorization:"Bearer "+accessToken }
   });
-  if(!r.ok) throw new Error("Calendar API "+r.status);
+  if(!r.ok){
+    let msg="", reason="";
+    try{
+      const j = await r.json();
+      msg    = (j.error && j.error.message) || "";
+      reason = (j.error && j.error.errors && j.error.errors[0] && j.error.errors[0].reason) || "";
+    }catch(_){}
+    let hint="";
+    if(r.status===403 && /accessNotConfigured|SERVICE_DISABLED/i.test(reason+msg))
+      hint = " — נראה ש-Google Calendar API לא מופעל בפרויקט. הפעל אותו ב-Cloud Console → APIs & Services → Library → Google Calendar API → Enable.";
+    else if(r.status===403)
+      hint = " — נראה שההרשאה ליומן לא אושרה. התנתק והתחבר מחדש ואשר את הרשאת הקריאה ליומן (calendar.readonly), וודא שאתה רשום כ-Test user במסך ההסכמה.";
+    console.error("Calendar API error", r.status, reason, msg);
+    throw new Error("Calendar API "+r.status+(reason?(" ["+reason+"]"):"")+(msg?(" — "+msg):"")+hint);
+  }
   return r.json();
 }
 
