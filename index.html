@@ -7,8 +7,17 @@
 
 <!-- Google Identity Services (OAuth) -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<!-- docx.js (Word generation, exposes global `docx`) -->
-<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+<!-- docx.js (Word generation, exposes global `docx`) — חובה נתיב UMD, build/index.js לא קיים (404) -->
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.min.js"></script>
+<script>
+window.addEventListener("load", function(){
+  if(typeof docx === "undefined"){          // CDN ראשי נפל — נסה מקור חלופי
+    var s=document.createElement("script");
+    s.src="https://unpkg.com/docx@8.5.0/build/index.umd.js";
+    document.head.appendChild(s);
+  }
+});
+</script>
 
 <!-- ערכת נושא מוקדמת (מונע הבהוב) -->
 <script>try{document.documentElement.setAttribute("data-theme",localStorage.getItem("pka_theme")||"light");}catch(e){}</script>
@@ -534,38 +543,58 @@ function buildDays(items, start, nDays){
 }
 
 /* ---------- בניית גריד ליום מפוצל (#3) + מיזוג משבצות (כלל #2) ---------- */
-/* גריד מבוסס משבצות-זמן: עמודות שעה → פלוגות → כלל הגדוד.
-   אירוע שנמשך על פני כמה משבצות ממוזג אנכית (rowspan / verticalMerge). */
+/* עמודות: שעה → פלוגות בלבד. אירוע כלל-גדודי = שורה אחת ברוחב מלא (merge על כל הטבלה).
+   אירוע פלוגתי ארוך ממוזג אנכית; שורת כלל-גדוד חוצצת שוברת את המיזוג
+   וההמשך מסומן "(המשך)" כדי לא לשבור את פריסת הטבלה. */
 function buildSplitGrid(day){
-  const plats = day.platoons;
-  const main = day.events.filter(e=>e.track==="main");
-  const slots = [...new Set(main.filter(e=>e.start).map(e=>e.start))].sort();
-  const untimed = main.filter(e=>!e.start);
-  const colKeys = [...plats, "_bat"];
-  const evsAt = (k,t)=> main.filter(e=> (k==="_bat" ? !e.platoon : e.platoon===k) && e.start===t);
-  const covered = {}; colKeys.forEach(k=> covered[k]=new Set());
+  const plats  = day.platoons;
+  const main   = day.events.filter(e=>e.track==="main");
+  const platEv = main.filter(e=> e.platoon && e.start);
+  const batEv  = main.filter(e=> !e.platoon && e.start);
+  const untimed= main.filter(e=> !e.start);
+  const pSlots = [...new Set(platEv.map(e=>e.start))].sort();
+  const barrier = (a,b)=> batEv.some(e=> e.start>a && e.start<=b);
 
-  const rows = slots.map((t,i)=>{
-    const cells={};
-    for(const k of colKeys){
-      if(covered[k].has(i)){ cells[k]={merge:"continue"}; continue; }
-      const evs = evsAt(k,t);
-      if(!evs.length){ cells[k]={evs:[],span:1}; continue; }
+  /* תכנון תאי הפלוגות לכל משבצת: התחלה / המשך-מיזוג / חזרה אחרי חציצה */
+  const plan={};
+  for(const L of plats){
+    plan[L]=new Array(pSlots.length).fill(null);
+    for(let i=0;i<pSlots.length;i++){
+      if(plan[L][i]) continue;                       // מכוסה ע"י מיזוג קודם
+      const t=pSlots[i];
+      let evs = platEv.filter(e=>e.platoon===L && e.start===t);
+      let resume=false;
+      if(!evs.length){                               // אירוע מתמשך שנקטע ע"י שורת כלל-גדוד
+        evs = platEv.filter(e=>e.platoon===L && e.start<t && e.end && e.end>t);
+        resume = evs.length>0;
+      }
+      if(!evs.length){ plan[L][i]={evs:[],span:1}; continue; }
       let span=1;
       if(evs.length===1 && evs[0].end){
-        for(let j=i+1; j<slots.length && slots[j]<evs[0].end; j++){
-          if(evsAt(k,slots[j]).length) break;   // אירוע אחר מתחיל → אין מיזוג מעבר
-          covered[k].add(j); span++;
+        for(let j=i+1; j<pSlots.length && pSlots[j]<evs[0].end; j++){
+          if(platEv.some(e=>e.platoon===L && e.start===pSlots[j])) break;  // אירוע חדש
+          if(barrier(pSlots[j-1], pSlots[j])) break;                       // שורת כלל-גדוד חוצצת
+          plan[L][j]={merge:"continue"}; span++;
         }
       }
-      cells[k]={evs, span};
+      plan[L][i]={evs, span, resume};
     }
-    /* תווית שעה — כלל #1: טווח "HH:MM-HH:MM" (סיום נפוץ מבין האירועים במשבצת) */
-    const ends = main.filter(e=>e.start===t && e.end).map(e=>e.end);
-    const label = ends.length ? t+"-"+modeOf(ends) : t;
-    return {time:t, label, cells};
-  });
-  return {rows, untimed, colKeys};
+  }
+
+  /* פליטת שורות לפי סדר זמן: שורות כלל-גדוד (רוחב מלא) לפני שורת הפלוגות באותה שעה */
+  const rows=[];
+  const allTimes=[...new Set([...pSlots, ...batEv.map(e=>e.start)])].sort();
+  for(const t of allTimes){
+    for(const e of batEv.filter(e=>e.start===t))
+      rows.push({type:"full", label:e.timeRange||t, ev:e});
+    const i=pSlots.indexOf(t);
+    if(i>=0){
+      const cells={}; plats.forEach(L=> cells[L]=plan[L][i]);
+      const ends = platEv.filter(e=>e.start===t && e.end).map(e=>e.end);
+      rows.push({type:"platoon", time:t, label: ends.length? t+"-"+modeOf(ends): t, cells});
+    }
+  }
+  return {rows, untimed, plats};
 }
 function modeOf(arr){
   const c={}; let best=arr[0];
@@ -660,31 +689,37 @@ function renderFlatTable(day){
   return tbl;
 }
 
-/* טבלת פלוגות (יום מפוצל) — שעה → פלוגות → כלל הגדוד, עם מיזוג משבצות (כלל #2) */
+/* טבלת פלוגות (יום מפוצל) — שעה → פלוגות; כלל-גדוד = שורה ממוזגת ברוחב מלא */
 function renderSplitTable(day){
-  const plats=day.platoons;
-  const {rows, untimed, colKeys}=buildSplitGrid(day);
+  const {rows, untimed, plats}=buildSplitGrid(day);
   const tbl=document.createElement("table");
-  tbl.innerHTML="<tr><th>שעה</th>"+plats.map(l=>`<th>פלוגה ${esc(l)}'</th>`).join("")+"<th>כלל הגדוד</th></tr>";
+  tbl.innerHTML="<tr><th>שעה</th>"+plats.map(l=>`<th>פלוגה ${esc(l)}'</th>`).join("")+"</tr>";
   for(const r of rows){
     const tr=document.createElement("tr");
-    let warn=false, html=`<td>${esc(r.label)}</td>`;
-    for(const k of colKeys){
-      const c=r.cells[k];
-      if(c.merge==="continue") continue;            // התא ממוזג מהשורה שמעל
-      const evs=c.evs||[];
-      if(evs.some(e=>e.issues.length)) warn=true;
-      const span=c.span>1?` rowspan="${c.span}"`:"";
-      html+=`<td${span}>${evs.map(e=>esc(evText(e))+badgeHtml(e)).join("<br>")||"—"}</td>`;
+    if(r.type==="full"){
+      if(r.ev.issues.length) tr.className="warn";
+      tr.classList.add("fullrow");
+      tr.innerHTML=`<td>${esc(r.label)}</td><td colspan="${plats.length}">${esc(evText(r.ev))}${badgeHtml(r.ev)}</td>`;
+    } else {
+      let warn=false, html=`<td>${esc(r.label)}</td>`;
+      for(const L of plats){
+        const c=r.cells[L];
+        if(c.merge==="continue") continue;          // התא ממוזג מהשורה שמעל
+        const evs=c.evs||[];
+        if(evs.some(e=>e.issues.length)) warn=true;
+        const span=c.span>1?` rowspan="${c.span}"`:"";
+        const txt=evs.map(e=>esc(evText(e))+badgeHtml(e)).join("<br>");
+        html+=`<td${span}>${txt ? txt+(c.resume?" (המשך)":"") : "—"}</td>`;
+      }
+      if(warn) tr.className="warn";
+      tr.innerHTML=html;
     }
-    if(warn) tr.className="warn";
-    tr.innerHTML=html;
     tbl.appendChild(tr);
   }
   for(const e of untimed){
     const tr=document.createElement("tr");
     tr.classList.add("fullrow");
-    tr.innerHTML=`<td>—</td><td colspan="${colKeys.length}">${esc(evText(e))}${badgeHtml(e)}</td>`;
+    tr.innerHTML=`<td>—</td><td colspan="${plats.length}">${esc(evText(e))}${badgeHtml(e)}</td>`;
     tbl.appendChild(tr);
   }
   return tbl;
@@ -851,21 +886,24 @@ async function exportDocx(){
     const mainEvents = day.events.filter(e=>e.track==="main");
 
     if(day.isSplit){
-      /* --- טבלת פלוגות: שעה → פלוגות → כלל הגדוד, מיזוג אנכי (כלל #2) --- */
-      const plats=day.platoons;
-      const {rows:grows, untimed, colKeys}=buildSplitGrid(day);
-      const timeW=1200, colW=Math.floor((9360-timeW)/colKeys.length);
-      const widths=[timeW, ...colKeys.map(()=>colW)];
+      /* --- טבלת פלוגות: שעה → פלוגות; כלל-גדוד = שורה ממוזגת ברוחב מלא --- */
+      const {rows:grows, untimed, plats}=buildSplitGrid(day);
+      const timeW=1200, colW=Math.floor((9360-timeW)/plats.length);
+      const widths=[timeW, ...plats.map(()=>colW)];
       const hdr=tableRow([ cell("שעה",{bold:true,shade:HEAD}),
-        ...plats.map(L=>cell("פלוגה "+L+"'",{bold:true,shade:HEAD})),
-        cell("כלל הגדוד",{bold:true,shade:HEAD}) ]);
+        ...plats.map(L=>cell("פלוגה "+L+"'",{bold:true,shade:HEAD})) ]);
       const bodyRows = grows.map(r=>{
+        if(r.type==="full"){
+          return tableRow([ cell(r.label,{bold:true}),
+            cell(evText(r.ev),{bold:true, span:plats.length, shade:r.ev.issues.length?WARN:null}) ]);
+        }
         const cells=[cell(r.label,{bold:true})];
-        for(const k of colKeys){
-          const c=r.cells[k];
+        for(const L of plats){
+          const c=r.cells[L];
           if(c.merge==="continue"){ cells.push(cell("",{vMerge:D.VerticalMergeType.CONTINUE})); continue; }
           const evs=c.evs||[];
-          cells.push(cell(evs.map(evText).join("\n")||"—", {
+          const txt=evs.map(evText).join("\n");
+          cells.push(cell(txt ? txt+(c.resume?" (המשך)":"") : "—", {
             shade: evs.some(e=>e.issues.length)?WARN:null,
             vMerge: c.span>1 ? D.VerticalMergeType.RESTART : undefined
           }));
@@ -873,7 +911,7 @@ async function exportDocx(){
         return tableRow(cells);
       });
       for(const e of untimed){
-        bodyRows.push(tableRow([cell("—",{bold:true}), cell(evText(e),{bold:true, span:colKeys.length})]));
+        bodyRows.push(tableRow([cell("—",{bold:true}), cell(evText(e),{bold:true, span:plats.length})]));
       }
       children.push(makeTable([hdr,...bodyRows], widths));
 
