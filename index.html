@@ -100,9 +100,19 @@ window.addEventListener("load", function(){
   /* --- ימים מפוצלים (#3) --- */
   tr.fullrow td{background:rgba(31,127,196,.10);font-weight:600;}
   .splittag{font-size:11px;color:var(--accent2);margin-inline-start:8px;}
-  /* --- לו"ז מקביל (ורוד) / פלס"ם (אפור) — כלל #5 --- */
-  tr.parallel td{background:rgba(232,62,140,.12);}
-  tr.palsam td{background:rgba(127,140,154,.20);}
+  /* --- טבלאות לו"ז בסגנון התבנית (1:1 עם pka_template) --- */
+  table.luz td, table.luz th{text-align:center;vertical-align:middle;}
+  table.luz tr.daytitle td{background:#a6a6a6;color:#000;font-weight:700;font-size:14px;}
+  table.luz tr.hdr th{background:#bfbfbf;color:#000;font-weight:700;}
+  table.luz tr.batrow td{background:#a6a6a6;color:#000;font-weight:700;}
+  table.luz td.timecell{font-weight:700;white-space:nowrap;}
+  table.luz .loc{display:block;font-size:11px;color:#666;font-weight:400;margin-top:2px;}
+  table.luz tr.batrow .loc{color:#333;}
+  /* --- נספח: לו"ז מקביל (ורוד) / פלס"ם (אפור) — כלל #5 --- */
+  table.appx tr.hdr th{background:#bfbfbf;color:#000;}
+  table.appx td.name{background:#bfbfbf;color:#000;font-weight:700;}
+  table.appx.parallel tr.hdr th, table.appx.parallel td.name{background:#f8cbdc;}
+  table.appx.palsam   tr.hdr th, table.appx.palsam   td.name{background:#d9d9d9;}
   .legend{font-size:12px;color:var(--muted);margin:6px 0 0;}
   .legend .sw{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-inline-start:4px;}
 
@@ -128,7 +138,7 @@ window.addEventListener("load", function(){
 <header>
   <div>
     <h1>מחולל פק"א — חיבור אוטומטי לגוגל קלנדר</h1>
-    <p>בא"פ מרכז 8222 · ביה"ס ללחימה · צוות מרכזי — מושך אירועי שבוע אימון מהיומן ומייצא פק"א בפורמט.</p>
+    <p>בא"פ מרכז 8222 · ביה"ס ללחימה · צוות מרכזי — מושך אירועי שבוע אימון מהיומן ומייצא את הלו"ז (יומי / מקביל / פלס"ם) בפורמט התבנית.</p>
   </div>
   <button id="themeToggle" class="ghost" type="button" aria-label="החלף ערכת נושא">🌙 מצב כהה</button>
 </header>
@@ -179,64 +189,20 @@ window.addEventListener("load", function(){
     </div>
   </div>
 
-  <!-- ===== פרטי הפק"א ===== -->
-  <div class="card">
-    <h2>3 · פרטי הפק"א (ניתן לערוך)</h2>
-    <label>נושא הפק"א (הנידון)</label>
-    <input id="subject" value='פק"א - אימון עד לרמת תרג"ד רטוב' />
-    <div class="grid" style="margin-top:10px">
-      <div>
-        <label>תאריך הפצה</label>
-        <input id="issueDate" type="date" />
-      </div>
-      <div>
-        <label>חותם</label>
-        <input id="signer" value="יהל מנור, סגן — מפקד צוות מרכזי" />
-      </div>
-    </div>
-    <div style="margin-top:10px">
-      <label>כללי</label>
-      <textarea id="secGeneral">כל פעם שמסומן הלו"ז בכתום – זהו לו"ז מקביל ויש להתייחס אליו במלוא תשומת הלב.
-בשבוע מתבצעים מטווחים, תרמ"חים יבשים ש"פ, תרפ"לים רטובים ש"פ, תרג"ד ש"ב עם ערכות מגנ"ט ותרג"ד ש"פ רטוב.</textarea>
-    </div>
-    <div style="margin-top:10px">
-      <label>הנחות יסוד</label>
-      <textarea id="secAssump">ביצוע תרגילים יבשים ורטובים.
-תרגול ע"פ פקודות בטיחות.
-המפקד המאמן – מפקדים מעבירים את רוב השבוע. אימון מפקדים איכותי = אימון איכותי.
-מעורבות החטמ"ר בכל הקשור לאימון במעטפת, תנאי לביצוע האימון.</textarea>
-    </div>
-    <div style="margin-top:10px">
-      <label>גורמים משפיעים</label>
-      <textarea id="secFactors">עונת החורף – באחריות הגדוד לספק חלפ"ס לכל לוחם וציוד מספק לקור. פק"לי חום בכוננות למקרה של מכת קור.
-ייתכנו גדודים נוספים מתאמנים במקביל בבא"פ.</textarea>
-    </div>
-    <div style="margin-top:10px">
-      <label>מטרת האימון</label>
-      <textarea id="secGoal">הגדוד יבצע אימון מוכוון לתרחיש האופרטיבי שלו, יחזק את כשירותו ומוכנותו לתרחיש קיצון, ויתמחה בשימוש בפק"לים ושילובם בלחימה.</textarea>
-    </div>
-    <div style="margin-top:10px">
-      <label>הישגים נדרשים</label>
-      <textarea id="secAchiev">מעבר כלל התכנים המחייבים ע"י כל מפקדי וחיילי הגדוד.
-שליטה בנשק ובאמל"ח המשמש את הגדוד.
-ביצוע איכותי וכמותי מלא של כלל ההסמכות והרענונים הנדרשים.</textarea>
-    </div>
-  </div>
-
   <!-- ===== תצוגה מקדימה ===== -->
   <div class="card">
-    <h2>4 · תצוגה מקדימה של הלו"ז</h2>
+    <h2>3 · תצוגה מקדימה של הלו"ז</h2>
     <div id="preview"><span class="hint">לאחר משיכת האירועים יוצג כאן הלו"ז המפורט לפי ימים.</span></div>
   </div>
 
   <!-- ===== ייצוא ===== -->
   <div class="card">
-    <h2>5 · ייצוא פק"א</h2>
+    <h2>4 · ייצוא לו"ז (Word)</h2>
     <div class="row">
-      <button id="exportBtn">צור והורד פק"א (Word)</button>
+      <button id="exportBtn">צור והורד לו"ז (Word)</button>
       <span id="exportState" class="statusbar"></span>
     </div>
-    <div class="hint">ניתן גם לייצא ללא חיבור ליומן — לחיצה על "צור והורד" תפיק תבנית ריקה בפורמט.</div>
+    <div class="hint">הקובץ כולל אך ורק את הלו"ז היומי, לו"ז מקביל ולו"ז פלס"ם — בפורמט זהה לתבנית. שאר סעיפי הפק"א ממולאים ידנית.</div>
   </div>
 
   <!-- ===== הגדרה ===== -->
@@ -261,6 +227,7 @@ window.addEventListener("load", function(){
 /* ---------- כלי עזר ---------- */
 const $ = id => document.getElementById(id);
 const HE_DAYS = ["יום א'","יום ב'","יום ג'","יום ד'","יום ה'","יום ו'","שבת"];
+const HE_DAYS_FULL = ["יום ראשון","יום שני","יום שלישי","יום רביעי","יום חמישי","יום שישי","שבת"];
 const UNKNOWN_LOC = "מיקום לא ידוע";
 const SCOPES = "https://www.googleapis.com/auth/calendar.readonly";
 
@@ -284,31 +251,6 @@ $("themeToggle").addEventListener("click", () => {
 /* שמירת Client ID מקומית */
 $("clientId").value = localStorage.getItem("pka_client_id") || "";
 $("clientId").addEventListener("change", e => localStorage.setItem("pka_client_id", e.target.value.trim()));
-
-/* ברירת מחדל לתאריכים */
-(function(){
-  const t = new Date();
-  $("issueDate").valueAsDate = t;
-})();
-
-/* ---------- מיפוי מקצוע לפי מילות מפתח ---------- */
-const PROF_MAP = [
-  ["קלעים","קלעים"],["נגב","נגב"],["מאג","מאג"],["מטול","מטול"],["לאו","לאו"],
-  ["צלפ","צלפים"],["אלפ","אלפ\"ה"],["אלפה","אלפ\"ה"],
-  ["מטווח","מטווחים"],["מטוו","מטווחים"],
-  ["סימולטור","סימולטור"],["תקשוב","תקשוב"],["קשר","תקשוב"],["ליונט","תקשוב"],
-  ["רפוא","רפואה"],["חובש","רפואה"],["תאג\"ד","רפואה"],["מט\"ב","רפואה"],
-  ["מזון","מזון"],["משיכ","מזון"],["חד\"א","מזון"],["א.ב","מזון"],["א.צ","מזון"],["א.ע","מזון"],
-  ["מגנ","מגנ\"ט"],["טיולי","הובלות"],["הובל","הובלות"],
-  ["שטח אש","שטחי אש"],["ש.א","שטחי אש"],["שטחי","שטחי אש"],
-  ["כיתה","כיתות"],["כיתת","כיתות"],
-  ["תחמושת","תחמושת"],["רחפן","רחפנים"]
-];
-function detectProf(text){
-  const t = (text||"");
-  for(const [k,v] of PROF_MAP){ if(t.indexOf(k)>=0) return v; }
-  return "כללי";
-}
 
 /* ---------- מיפוי צבע אירוע (colorId) — מקור האמת לשיוך ---------- */
 /* אדום=א' · כתום=ב' · צהוב=ג' · ירוק=ד' · ורוד=לו"ז מקביל · אפור=פלס"ם.
@@ -475,7 +417,12 @@ function buildDays(items, start, nDays){
     const d = new Date(start); d.setDate(d.getDate()+i);
     const dd = String(d.getDate()).padStart(2,"0");
     const mm = String(d.getMonth()+1).padStart(2,"0");
-    parsedDays.push({date:d, label:HE_DAYS[d.getDay()]+" "+dd+"/"+mm, events:[]});
+    parsedDays.push({
+      date:d,
+      label:HE_DAYS[d.getDay()]+" "+dd+"/"+mm,          // קצר — לכותרות תצוגה
+      titleFull:HE_DAYS_FULL[d.getDay()]+" – "+dd+"."+mm, // מלא — לשורת כותרת הטבלה (כמו התבנית)
+      events:[]
+    });
   }
   for(const ev of items){
     const allDay = !!(ev.start && ev.start.date);
@@ -525,8 +472,7 @@ function buildDays(items, start, nDays){
       track: track,
       location: (ev.location||meta.locOverride||"").trim() || UNKNOWN_LOC,
       giver: meta.giver||"",
-      notes: notes,
-      prof: detectProf(summary+" "+(ev.description||""))
+      notes: notes
     };
     obj.timeRange = obj.start ? (obj.start + (obj.end ? "-"+obj.end : "")) : "";  // כלל #1
     obj.issues = computeIssues(obj);
@@ -542,219 +488,153 @@ function buildDays(items, start, nDays){
   });
 }
 
-/* ---------- בניית גריד ליום מפוצל (#3) + מיזוג משבצות (כלל #2) ---------- */
-/* עמודות: שעה → פלוגות בלבד. אירוע כלל-גדודי = שורה אחת ברוחב מלא (merge על כל הטבלה).
-   אירוע פלוגתי ארוך ממוזג אנכית; שורת כלל-גדוד חוצצת שוברת את המיזוג
-   וההמשך מסומן "(המשך)" כדי לא לשבור את פריסת הטבלה. */
-function buildSplitGrid(day){
-  const plats  = day.platoons;
-  const main   = day.events.filter(e=>e.track==="main");
-  const platEv = main.filter(e=> e.platoon && e.start);
-  const batEv  = main.filter(e=> !e.platoon && e.start);
-  const untimed= main.filter(e=> !e.start);
-  const pSlots = [...new Set(platEv.map(e=>e.start))].sort();
-  const barrier = (a,b)=> batEv.some(e=> e.start>a && e.start<=b);
+/* ---------- בניית שורות לו"ז יומי (פורמט התבנית 1:1) ---------- */
+/* שורות לפי טווח-זמן (כמו התבנית — אין מיזוג אנכי בין שורות):
+   - אירוע כלל-גדודי / עוגן (ארוחות, חד"א, ערב גדוד) = שורה אחת ברוחב מלא (גוון אפור כהה).
+   - אירועי פלוגות באותו טווח-זמן = שורה אחת, תא לכל פלוגה (פעילות + מיקום).
+   ביום לא מפוצל: עוגנים = שורה ברוחב מלא; שאר הפעילויות = שעה|פעילות|מיקום|גורם|הערות. */
+function isAnchor(e){
+  return /חד["״']?א|ארוח|ערב גדוד|מסדר|א["״.']?\s*[בצע]\b/.test((e.cleanSummary||e.summary||""));
+}
+function startKey(e){ return e.start || "99:99"; }
 
-  /* תכנון תאי הפלוגות לכל משבצת: התחלה / המשך-מיזוג / חזרה אחרי חציצה */
-  const plan={};
-  for(const L of plats){
-    plan[L]=new Array(pSlots.length).fill(null);
-    for(let i=0;i<pSlots.length;i++){
-      if(plan[L][i]) continue;                       // מכוסה ע"י מיזוג קודם
-      const t=pSlots[i];
-      let evs = platEv.filter(e=>e.platoon===L && e.start===t);
-      let resume=false;
-      if(!evs.length){                               // אירוע מתמשך שנקטע ע"י שורת כלל-גדוד
-        evs = platEv.filter(e=>e.platoon===L && e.start<t && e.end && e.end>t);
-        resume = evs.length>0;
-      }
-      if(!evs.length){ plan[L][i]={evs:[],span:1}; continue; }
-      let span=1;
-      if(evs.length===1 && evs[0].end){
-        for(let j=i+1; j<pSlots.length && pSlots[j]<evs[0].end; j++){
-          if(platEv.some(e=>e.platoon===L && e.start===pSlots[j])) break;  // אירוע חדש
-          if(barrier(pSlots[j-1], pSlots[j])) break;                       // שורת כלל-גדוד חוצצת
-          plan[L][j]={merge:"continue"}; span++;
-        }
-      }
-      plan[L][i]={evs, span, resume};
+function buildDayRows(day){
+  const main = day.events.filter(e=>e.track==="main");
+  if(day.isSplit){
+    const plats = day.platoons;
+    const batEv = main.filter(e=> !e.platoon);
+    const platEv= main.filter(e=> e.platoon);
+    const groups = {};                       // טווח-זמן → {start, label, cells}
+    for(const e of platEv){
+      const key = e.timeRange || "כל היום";
+      if(!groups[key]) groups[key] = {start:startKey(e), label:e.timeRange||"כל היום", cells:{}};
+      (groups[key].cells[e.platoon] = groups[key].cells[e.platoon] || []).push(e);
     }
+    const rows = [];
+    for(const e of batEv) rows.push({kind:"bat", start:startKey(e), label:e.timeRange||"כל היום", ev:e});
+    for(const k in groups){ const g=groups[k]; rows.push({kind:"split", start:g.start, label:g.label, cells:g.cells}); }
+    rows.sort((a,b)=> a.start.localeCompare(b.start));
+    return {kind:"split", plats, rows};
+  } else {
+    const rows = main.slice().sort((a,b)=> startKey(a).localeCompare(startKey(b)))
+                     .map(e=> ({kind: isAnchor(e)?"bat":"normal", label:e.timeRange||"כל היום", ev:e}));
+    return {kind:"flat", rows};
   }
+}
 
-  /* פליטת שורות לפי סדר זמן: שורות כלל-גדוד (רוחב מלא) לפני שורת הפלוגות באותה שעה */
-  const rows=[];
-  const allTimes=[...new Set([...pSlots, ...batEv.map(e=>e.start)])].sort();
-  for(const t of allTimes){
-    for(const e of batEv.filter(e=>e.start===t))
-      rows.push({type:"full", label:e.timeRange||t, ev:e});
-    const i=pSlots.indexOf(t);
-    if(i>=0){
-      const cells={}; plats.forEach(L=> cells[L]=plan[L][i]);
-      const ends = platEv.filter(e=>e.start===t && e.end).map(e=>e.end);
-      rows.push({type:"platoon", time:t, label: ends.length? t+"-"+modeOf(ends): t, cells});
-    }
-  }
-  return {rows, untimed, plats};
+/* ---------- מטריצת נספח: לו"ז מקביל / פלס"ם (פורמט הסמכות-ורענונים בתבנית) ---------- */
+/* שורה לכל פעילות, עמודה לכל יום (טווח-זמן בתא), + עמודות למילוי ידני. */
+function buildAppendixMatrix(track){
+  const found = [];
+  parsedDays.forEach((d,di)=> d.events.forEach(e=>{ if(e.track===track) found.push({di,e}); }));
+  if(!found.length) return null;
+  const names = [...new Set(found.map(x=>x.e.cleanSummary))];
+  const rows = names.map(name=>{
+    const perDay = parsedDays.map((d,di)=>
+      found.filter(x=>x.di===di && x.e.cleanSummary===name)
+           .map(x=>x.e.timeRange||"כל היום").join("\n"));
+    return {name, perDay};
+  });
+  return {rows, dayLabels:parsedDays.map(d=>HE_DAYS[d.date.getDay()])};
 }
-function modeOf(arr){
-  const c={}; let best=arr[0];
-  for(const v of arr){ c[v]=(c[v]||0)+1; if(c[v]>c[best]) best=v; }
-  return best;
-}
-/* טקסט תצוגה לפעילות: פעילות נקייה + מיקום אם ידוע */
-function evText(e){
-  let s = e.cleanSummary;
-  if(e.location && e.location!==UNKNOWN_LOC) s += " — " + e.location;
-  return s;
-}
+
 function badgeHtml(e){
   return e.issues && e.issues.length ? `<span class="badge">⚠ ${esc(e.issues.join(" · "))}</span>` : "";
 }
 
-/* ---------- תצוגה מקדימה ---------- */
+/* ---------- תצוגה מקדימה (זהה לפלט ה-Word) ---------- */
 function renderPreview(){
   const host = $("preview");
-  if(!parsedDays.some(d=>d.events.length)){ host.innerHTML='<span class="hint">לא נמצאו אירועים בטווח שנבחר.</span>'; return; }
+  if(!parsedDays.some(d=>d.events.some(e=>e.track==="main"))){ host.innerHTML='<span class="hint">לא נמצאו אירועי לו"ז בטווח שנבחר.</span>'; return; }
   host.innerHTML="";
 
-  /* מונה אי-ודאות גלובלי */
-  let flagged=0; parsedDays.forEach(d=>d.events.forEach(e=>{ if(e.issues.length) flagged++; }));
+  /* מונה אי-ודאות (לו"ז ראשי בלבד) */
+  let flagged=0; parsedDays.forEach(d=>d.events.forEach(e=>{ if(e.track==="main" && e.issues.length) flagged++; }));
   const bar=document.createElement("div");
-  if(flagged){ bar.className="reviewbar"; bar.textContent=`⚠ ${flagged} פעילויות דורשות בדיקה ידנית (שעה / מיקום / גורם מעביר חסרים) — מסומנות בצהוב.`; }
-  else       { bar.className="reviewbar clean"; bar.textContent="✓ כל הפעילויות זוהו במלואן."; }
+  if(flagged){ bar.className="reviewbar"; bar.textContent=`⚠ ${flagged} פעילויות דורשות בדיקה ידנית (שעה / מיקום חסרים) — מסומנות בצהוב.`; }
+  else       { bar.className="reviewbar clean"; bar.textContent='✓ כל פעילויות הלו"ז זוהו.'; }
   host.appendChild(bar);
 
   for(const day of parsedDays){
-    const mainCount = day.events.filter(e=>e.track==="main").length;
-    const extraCount = day.events.length - mainCount;
+    if(!day.events.some(e=>e.track==="main")) continue;
     const box=document.createElement("div"); box.className="daybox";
-    const head=document.createElement("div"); head.className="dayhead";
-    head.innerHTML = esc(day.label)+" — "+mainCount+" פעילויות" +
-      (extraCount ? ` <span class="splittag">(+${extraCount} מקביל/פלס"ם)</span>` : "") +
-      (day.isSplit ? `<span class="splittag">⇆ יום מפוצל (${day.platoons.map(l=>"פלוגה "+l+"'").join(", ")})</span>` : "");
-    box.appendChild(head);
-    if(mainCount){
-      box.appendChild(day.isSplit ? renderSplitTable(day) : renderFlatTable(day));
-    }
+    box.appendChild(renderLuzTable(day));
     host.appendChild(box);
   }
 
-  /* ---- כלל #5: לו"ז מקביל (ורוד) + פלס"ם (אפור) — טבלה נפרדת בסוף ---- */
-  const extras=[];
-  parsedDays.forEach(d=> d.events.forEach(e=>{ if(e.track!=="main") extras.push({day:d.label, e}); }));
-  if(extras.length){
+  appendix("parallel",'נספח – לו"ז מקביל','ורוד');
+  appendix("palsam",  'נספח – לו"ז פלס"ם','אפור');
+
+  function appendix(track,title,colorWord){
+    const m=buildAppendixMatrix(track); if(!m) return;
     const box=document.createElement("div"); box.className="daybox";
     const head=document.createElement("div"); head.className="dayhead";
-    head.textContent = 'לו"ז מקביל ופלס"ם — '+extras.length+" פעילויות (לפי צבע האירוע ביומן)";
+    head.textContent = title+" (לפי צבע "+colorWord+" ביומן)";
     box.appendChild(head);
-    const tbl=document.createElement("table");
-    tbl.innerHTML="<tr><th>יום</th><th>שעה</th><th>פעילות</th><th>מיקום</th><th>סוג</th></tr>";
-    for(const {day,e} of extras){
-      const tr=document.createElement("tr");
-      tr.className = e.track==="palsam" ? "palsam" : "parallel";
-      tr.innerHTML =
-        `<td>${esc(day)}</td>`+
-        `<td>${esc(e.timeRange||"כל היום")}</td>`+
-        `<td>${esc(e.cleanSummary)}${badgeHtml(e)}</td>`+
-        `<td${e.location===UNKNOWN_LOC?' class="miss"':''}>${esc(e.location)}</td>`+
-        `<td>${e.track==="palsam"?'פלס"ם':"מקביל"}</td>`;
-      tbl.appendChild(tr);
-    }
-    box.appendChild(tbl);
-    const leg=document.createElement("div"); leg.className="legend";
-    leg.innerHTML = 'מקרא: <span class="sw" style="background:rgba(232,62,140,.45)"></span> ורוד = לו"ז מקביל · <span class="sw" style="background:rgba(127,140,154,.55)"></span> אפור = לו"ז פלס"ם';
-    box.appendChild(leg);
+    box.appendChild(renderAppendixTable(track,m));
     host.appendChild(box);
   }
 }
 
-/* טבלה רגילה (יום לא מפוצל) — שעה (טווח, כלל #1) → פעילות → מיקום → גורם → הערות */
-function renderFlatTable(day){
-  const tbl=document.createElement("table");
-  tbl.innerHTML="<tr><th>שעה</th><th>פעילות</th><th>מיקום</th><th>גורם מעביר</th><th>הערות</th></tr>";
-  for(const e of day.events.filter(x=>x.track==="main")){
-    const tr=document.createElement("tr");
-    if(e.issues.length) tr.className="warn";
-    const locCls = e.location===UNKNOWN_LOC ? ' class="miss"' : "";
-    const givCls = !e.giver ? ' class="miss"' : "";
-    const timCls = !e.start ? ' class="miss"' : "";
-    tr.innerHTML =
-      `<td${timCls}>${esc(e.timeRange||"—")}</td>`+
-      `<td>${esc(e.cleanSummary)}</td>`+
-      `<td${locCls}>${esc(e.location)}</td>`+
-      `<td${givCls}>${esc(e.giver||"—")}</td>`+
-      `<td>${esc(e.notes)}${badgeHtml(e)}</td>`;
-    tbl.appendChild(tr);
+/* תא פלוגה בתצוגה: פעילות + שורת מיקום (תמיד, כולל "מיקום לא ידוע" — כמו התבנית) */
+function cellHtml(e){
+  return esc(e.cleanSummary)+badgeHtml(e)+`<span class="loc">${esc(e.location)}</span>`;
+}
+
+/* טבלת לו"ז יומי בסגנון התבנית: שורת-כותרת יום (אפור כהה) → כותרות → שורות נתונים */
+function renderLuzTable(day){
+  const data=buildDayRows(day);
+  const cols = data.kind==="split" ? data.plats.length+1 : 5;
+  const tbl=document.createElement("table"); tbl.className="luz";
+  let html=`<tr class="daytitle"><td colspan="${cols}">${esc(day.titleFull)}</td></tr>`;
+  if(data.kind==="split"){
+    html+=`<tr class="hdr"><th>שעה</th>`+data.plats.map(L=>`<th>פלוגה ${esc(L)}'</th>`).join("")+`</tr>`;
+    for(const r of data.rows){
+      if(r.kind==="bat"){
+        html+=`<tr class="batrow"><td class="timecell">${esc(r.label)}</td>`+
+              `<td colspan="${data.plats.length}">${esc(r.ev.cleanSummary)}${badgeHtml(r.ev)}</td></tr>`;
+      } else {
+        html+=`<tr><td class="timecell">${esc(r.label)}</td>`;
+        for(const L of data.plats){
+          const evs=r.cells[L]||[];
+          html+=`<td>${evs.length?evs.map(cellHtml).join("<br>"):"—"}</td>`;
+        }
+        html+=`</tr>`;
+      }
+    }
+  } else {
+    html+=`<tr class="hdr"><th>שעה</th><th>פעילות</th><th>מיקום</th><th>גורם מעביר</th><th>הערות</th></tr>`;
+    for(const r of data.rows){
+      if(r.kind==="bat"){
+        html+=`<tr class="batrow"><td class="timecell">${esc(r.label)}</td>`+
+              `<td colspan="4">${esc(r.ev.cleanSummary)}${badgeHtml(r.ev)}</td></tr>`;
+      } else {
+        const e=r.ev;
+        html+=`<tr${e.issues.length?' class="warn"':''}><td class="timecell">${esc(r.label)}</td>`+
+              `<td>${esc(e.cleanSummary)}${badgeHtml(e)}</td>`+
+              `<td${e.location===UNKNOWN_LOC?' class="miss"':''}>${esc(e.location)}</td>`+
+              `<td>${esc(e.giver||"—")}</td><td>${esc(e.notes)}</td></tr>`;
+      }
+    }
   }
+  tbl.innerHTML=html;
   return tbl;
 }
 
-/* טבלת פלוגות (יום מפוצל) — שעה → פלוגות; כלל-גדוד = שורה ממוזגת ברוחב מלא */
-function renderSplitTable(day){
-  const {rows, untimed, plats}=buildSplitGrid(day);
-  const tbl=document.createElement("table");
-  tbl.innerHTML="<tr><th>שעה</th>"+plats.map(l=>`<th>פלוגה ${esc(l)}'</th>`).join("")+"</tr>";
-  for(const r of rows){
-    const tr=document.createElement("tr");
-    if(r.type==="full"){
-      if(r.ev.issues.length) tr.className="warn";
-      tr.classList.add("fullrow");
-      tr.innerHTML=`<td>${esc(r.label)}</td><td colspan="${plats.length}">${esc(evText(r.ev))}${badgeHtml(r.ev)}</td>`;
-    } else {
-      let warn=false, html=`<td>${esc(r.label)}</td>`;
-      for(const L of plats){
-        const c=r.cells[L];
-        if(c.merge==="continue") continue;          // התא ממוזג מהשורה שמעל
-        const evs=c.evs||[];
-        if(evs.some(e=>e.issues.length)) warn=true;
-        const span=c.span>1?` rowspan="${c.span}"`:"";
-        const txt=evs.map(e=>esc(evText(e))+badgeHtml(e)).join("<br>");
-        html+=`<td${span}>${txt ? txt+(c.resume?" (המשך)":"") : "—"}</td>`;
-      }
-      if(warn) tr.className="warn";
-      tr.innerHTML=html;
-    }
-    tbl.appendChild(tr);
+/* טבלת נספח (מקביל/פלס"ם) בפורמט מטריצת הסמכות-ורענונים של התבנית */
+function renderAppendixTable(track,m){
+  const tbl=document.createElement("table"); tbl.className="appx "+track;
+  let html=`<tr class="hdr"><th>אימון</th>`+m.dayLabels.map(l=>`<th>${esc(l)}</th>`).join("")+
+           `<th>מס' חיילים</th><th>מדריכה</th><th>חונך</th><th>קצין אחראי</th></tr>`;
+  for(const row of m.rows){
+    html+=`<tr><td class="name">${esc(row.name)}</td>`+
+      row.perDay.map(c=>`<td>${c?esc(c).replace(/\n/g,"<br>"):"—"}</td>`).join("")+
+      `<td></td><td>למלא</td><td>למלא</td><td></td></tr>`;
   }
-  for(const e of untimed){
-    const tr=document.createElement("tr");
-    tr.classList.add("fullrow");
-    tr.innerHTML=`<td>—</td><td colspan="${plats.length}">${esc(evText(e))}${badgeHtml(e)}</td>`;
-    tbl.appendChild(tr);
-  }
+  tbl.innerHTML=html;
   return tbl;
 }
 function esc(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
-
-/* ---------- בניית טבלת דרישות לפי מקצוע ---------- */
-function buildRequirementMatrix(){
-  const profs = ["מזון","תקשוב","רפואה","מטווחים","שטחי אש","סימולטור","הובלות","כיתות","מגנ\"ט","תחמושת","קלעים","נגב","מאג","מטול","לאו","רחפנים"];
-  const matrix = {};
-  for(const day of parsedDays){
-    for(const e of day.events){
-      if(!matrix[e.prof]) matrix[e.prof]={};
-      const cell = matrix[e.prof][day.label] || "";
-      const piece = (e.start?e.start:"") + (e.end?("–"+e.end):"") + " " + e.summary + (e.location&&e.location!==UNKNOWN_LOC?(" ("+e.location+")"):"");
-      matrix[e.prof][day.label] = cell ? cell+"\n"+piece : piece;
-    }
-  }
-  const used = profs.filter(p=>matrix[p]);
-  // הוסף מקצועות שלא ברשימה אך הופיעו
-  Object.keys(matrix).forEach(p=>{ if(!used.includes(p) && p!=="כללי") used.push(p); });
-  return {rows:used, matrix};
-}
-
-/* ---------- חלוקת בוקר/צהריים/ערב ל"לו"ז עקרוני" ---------- */
-function bucketByPart(events){
-  const b={"בוקר":[],"צהריים":[],"ערב":[]};
-  for(const e of events){
-    if(e.track!=="main") continue;   // מקביל/פלס"ם לא נכנסים ללו"ז העקרוני
-    const h = parseInt((e.start||"00").split(":")[0],10);
-    const part = h<12?"בוקר": h<18?"צהריים":"ערב";
-    b[part].push(e.summary);
-  }
-  return b;
-}
 
 /* ====================================================== */
 /* ===============  יצירת מסמך Word (docx)  ============== */
@@ -765,208 +645,138 @@ async function exportDocx(){
   if(typeof docx==="undefined"){ alert("ספריית יצירת ה-Word עדיין נטענת, נסה שוב."); return; }
   $("exportState").textContent="בונה מסמך…";
   const D = docx;
-  const FONT="Arial";
-  const WARN="FFF2CC";   // צהוב בהיר לשדות חסרים/לא ודאיים (#2)
+  const FONT="David";          // לפי התבנית
+  const FULLW=9360;            // רוחב טבלה מלא (twips) — כמו התבנית (~9351)
+  const DARK="A6A6A6", HEAD="BFBFBF", WARN="FFF2CC";
+  const PINK="F8CBDC", GRAYP="D9D9D9";
 
   /* helpers */
   const rtl = (text, opt={}) => new D.TextRun({text, rightToLeft:true, font:FONT, ...opt});
   const P = (children, opt={}) => new D.Paragraph({bidirectional:true, alignment:D.AlignmentType.RIGHT, children:Array.isArray(children)?children:[children], ...opt});
-  const heading = (t) => new D.Paragraph({
-    bidirectional:true, alignment:D.AlignmentType.RIGHT, spacing:{before:200,after:80},
-    children:[rtl(t,{bold:true,size:26,underline:{}})]
-  });
-  const bullet = (t) => new D.Paragraph({
-    bidirectional:true, alignment:D.AlignmentType.RIGHT, bullet:{level:0},
-    children:[rtl(t,{size:22})]
-  });
-  const textLines = (s) => (s||"").split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  const textLines = (s) => (s===null||s===undefined?"":String(s)).split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
 
-  function cell(text, {bold=false, shade=null, w=null, span=null, vMerge=null}={}){
+  /* תא טבלה בסגנון התבנית: David sz18, ממורכז אנכית, RTL */
+  function cell(text, {bold=false, shade=null, span=null, align="center"}={}){
+    const al = align==="right"?D.AlignmentType.RIGHT:D.AlignmentType.CENTER;
+    const ls = textLines(text);
     return new D.TableCell({
       columnSpan: span||undefined,
-      verticalMerge: vMerge||undefined,
-      width: w?{size:w,type:D.WidthType.DXA}:undefined,
-      shading: shade?{fill:shade,type:D.ShadingType.CLEAR}:undefined,
-      margins:{top:40,bottom:40,left:80,right:80},
-      children: textLines(text).length
-        ? textLines(text).map(line=>P(rtl(line,{bold,size:18})))
-        : [P(rtl("",{size:18}))]
+      verticalAlign: D.VerticalAlign.CENTER,
+      shading: shade?{fill:shade,type:D.ShadingType.CLEAR,color:"auto"}:undefined,
+      margins:{top:30,bottom:30,left:80,right:80},
+      children: ls.length
+        ? ls.map(line=> new D.Paragraph({bidirectional:true, alignment:al, children:[rtl(line,{bold,size:18})]}))
+        : [new D.Paragraph({bidirectional:true, alignment:al, children:[rtl("",{size:18})]})]
     });
   }
-  function tableRow(cells){ return new D.TableRow({children:cells}); }
+  const tableRow = cells => new D.TableRow({children:cells});
+  const B = {style:D.BorderStyle.SINGLE, size:4, color:"000000"};
   function makeTable(rows, colWidths){
     return new D.Table({
       visuallyRightToLeft:true,
       width:{size:colWidths.reduce((a,b)=>a+b,0),type:D.WidthType.DXA},
       columnWidths:colWidths,
+      borders:{top:B,bottom:B,left:B,right:B,insideHorizontal:B,insideVertical:B},
       rows
     });
   }
 
-  const children=[];
-
-  /* ---- כותרת ---- */
-  children.push(P(rtl("-שמור-",{bold:true,size:20}), {alignment:D.AlignmentType.CENTER}));
-  children.push(P(rtl('בא"פ מרכז 8222',{size:20})));
-  children.push(P(rtl('ביה"ס ללחימה',{size:20})));
-  children.push(P(rtl('צוות מרכזי',{size:20,bold:true})));
-  const issued = $("issueDate").value ? new Date($("issueDate").value).toLocaleDateString("he-IL",{day:"numeric",month:"long",year:"numeric"}) : "";
-  children.push(P(rtl(issued,{size:20})));
-  children.push(P(rtl("",{size:8})));
-
-  /* ---- הנידון ---- */
-  const battalion = $("battalion").value.trim() || "____";
-  const subj = $("subject").value.trim()+" לגדוד "+battalion;
-  children.push(P([rtl("הנידון: ",{bold:true,size:24}), rtl(subj,{bold:true,size:24})]));
-  children.push(P(rtl("",{size:8})));
-
-  /* ---- סעיפים טקסטואליים ---- */
-  const sectionsDef = [
-    ["כללי", $("secGeneral").value],
-    ["הנחות יסוד", $("secAssump").value],
-    ["גורמים משפיעים", $("secFactors").value],
-    ["מטרת האימון", $("secGoal").value],
-    ["הישגים נדרשים", $("secAchiev").value],
-  ];
-  for(const [title,body] of sectionsDef){
-    children.push(heading(title));
-    const lines = textLines(body);
-    if(lines.length) lines.forEach(l=>children.push(bullet(l)));
-    else children.push(P(rtl("למלא.",{size:22})));
-  }
-
-  /* ---- טבלת דרישות לפי מקצוע ---- */
-  if(parsedDays.some(d=>d.events.length)){
-    children.push(heading("ריכוז דרישות לפי מקצוע (מתוך היומן)"));
-    const {rows, matrix} = buildRequirementMatrix();
-    const dayLabels = parsedDays.map(d=>d.label);
-    const colCount = dayLabels.length+1;
-    const total = 9360;
-    const firstW = 1400;
-    const dayW = Math.floor((total-firstW)/dayLabels.length);
-    const widths = [firstW, ...dayLabels.map(()=>dayW)];
-    const header = tableRow([cell("מקצוע",{bold:true,shade:"13202D"}), ...dayLabels.map(l=>cell(l,{bold:true,shade:"13202D"}))]);
-    const bodyRows = rows.map(p=>{
-      return tableRow([ cell(p,{bold:true,shade:"1F2D3D"}), ...dayLabels.map(dl=>cell((matrix[p]&&matrix[p][dl])||"")) ]);
-    });
-    children.push(makeTable([header,...bodyRows], widths));
-    children.push(P(rtl("",{size:8})));
-  }
-
-  /* ---- לו"ז עקרוני (מודל בוקר/צהריים/ערב) ---- */
-  if(parsedDays.some(d=>d.events.length)){
-    children.push(heading('לו"ז עקרוני (מודל)'));
-    const dayLabels = parsedDays.map(d=>d.label);
-    const total=9360, firstW=1200;
-    const dayW=Math.floor((total-firstW)/dayLabels.length);
-    const widths=[firstW,...dayLabels.map(()=>dayW)];
-    const header = tableRow([cell("זמן",{bold:true,shade:"13202D"}), ...dayLabels.map(l=>cell(l,{bold:true,shade:"13202D"}))]);
-    const partRows = ["בוקר","צהריים","ערב"].map(part=>{
-      const cells=[cell(part,{bold:true,shade:"1F2D3D"})];
-      for(const day of parsedDays){
-        const b=bucketByPart(day.events);
-        cells.push(cell((b[part]||[]).join("\n")));
-      }
-      return tableRow(cells);
-    });
-    children.push(makeTable([header,...partRows], widths));
-    children.push(P(rtl("",{size:8})));
-  }
-
-  /* ---- נספח א' — לו"ז פרטני ליום (טבלה לעמוד, מעבר עמוד בין ימים) ---- */
-  children.push(new D.Paragraph({pageBreakBefore:true, bidirectional:true, alignment:D.AlignmentType.RIGHT, children:[rtl("נספח א' – לו\"ז פרטני לאימון",{bold:true,size:26,underline:{}})]}));
-  const HEAD="13202D";
-  parsedDays.forEach((day, di)=>{
-    const splitNote = day.isSplit ? "  (יום מפוצל)" : "";
-    children.push(new D.Paragraph({
-      pageBreakBefore: di>0, bidirectional:true, alignment:D.AlignmentType.RIGHT,
-      spacing:{before:160,after:60},
-      children:[rtl(day.label+splitNote,{bold:true,size:24})]
-    }));
-    const mainEvents = day.events.filter(e=>e.track==="main");
-
-    if(day.isSplit){
-      /* --- טבלת פלוגות: שעה → פלוגות; כלל-גדוד = שורה ממוזגת ברוחב מלא --- */
-      const {rows:grows, untimed, plats}=buildSplitGrid(day);
-      const timeW=1200, colW=Math.floor((9360-timeW)/plats.length);
+  /* ---- טבלת לו"ז יומי (פורמט התבנית) ---- */
+  function luzTableDocx(day){
+    const data=buildDayRows(day);
+    const rows=[];
+    if(data.kind==="split"){
+      const plats=data.plats, nCol=plats.length+1;
+      const timeW=1100, colW=Math.floor((FULLW-timeW)/plats.length);
       const widths=[timeW, ...plats.map(()=>colW)];
-      const hdr=tableRow([ cell("שעה",{bold:true,shade:HEAD}),
-        ...plats.map(L=>cell("פלוגה "+L+"'",{bold:true,shade:HEAD})) ]);
-      const bodyRows = grows.map(r=>{
-        if(r.type==="full"){
-          return tableRow([ cell(r.label,{bold:true}),
-            cell(evText(r.ev),{bold:true, span:plats.length, shade:r.ev.issues.length?WARN:null}) ]);
+      rows.push(tableRow([ cell(day.titleFull,{bold:true,shade:DARK,span:nCol}) ]));
+      rows.push(tableRow([ cell("שעה",{bold:true,shade:HEAD}), ...plats.map(L=>cell("פלוגה "+L+"'",{bold:true,shade:HEAD})) ]));
+      for(const r of data.rows){
+        if(r.kind==="bat"){
+          rows.push(tableRow([ cell(r.label,{bold:true,shade: r.ev.start?DARK:WARN}),
+            cell(r.ev.cleanSummary,{bold:true,shade:DARK,span:plats.length}) ]));
+        } else {
+          const cells=[ cell(r.label,{bold:true}) ];
+          for(const L of plats){
+            const evs=r.cells[L]||[];
+            const txt = evs.map(e=> e.cleanSummary+"\n"+e.location).join("\n");
+            cells.push(cell(txt));
+          }
+          rows.push(tableRow(cells));
         }
-        const cells=[cell(r.label,{bold:true})];
-        for(const L of plats){
-          const c=r.cells[L];
-          if(c.merge==="continue"){ cells.push(cell("",{vMerge:D.VerticalMergeType.CONTINUE})); continue; }
-          const evs=c.evs||[];
-          const txt=evs.map(evText).join("\n");
-          cells.push(cell(txt ? txt+(c.resume?" (המשך)":"") : "—", {
-            shade: evs.some(e=>e.issues.length)?WARN:null,
-            vMerge: c.span>1 ? D.VerticalMergeType.RESTART : undefined
-          }));
-        }
-        return tableRow(cells);
-      });
-      for(const e of untimed){
-        bodyRows.push(tableRow([cell("—",{bold:true}), cell(evText(e),{bold:true, span:plats.length})]));
       }
-      children.push(makeTable([hdr,...bodyRows], widths));
-
+      return makeTable(rows, widths);
     } else {
-      /* --- טבלה רגילה: שעה (טווח) → פעילות → מיקום → גורם מעביר → הערות --- */
-      const flatWidths=[1300,3360,1700,1500,1500]; // => 9360
-      const hdr = tableRow([
-        cell("שעה",{bold:true,shade:HEAD}), cell("פעילות",{bold:true,shade:HEAD}),
-        cell("מיקום",{bold:true,shade:HEAD}), cell("גורם מעביר",{bold:true,shade:HEAD}),
-        cell("הערות",{bold:true,shade:HEAD})
-      ]);
-      const rows = mainEvents.length ? mainEvents.map(e=> tableRow([
-        cell(e.timeRange||"—", {bold:true, shade: !e.start?WARN:null}),
-        cell(e.cleanSummary,{bold:true}),
-        cell(e.location,   {shade: e.location===UNKNOWN_LOC?WARN:null}),
-        cell(e.giver||"—", {shade: !e.giver?WARN:null}),
-        cell(e.notes)
-      ])) : [ tableRow([cell(""),cell("— אין פעילויות ביום זה —"),cell(""),cell(""),cell("")]) ];
-      children.push(makeTable([hdr,...rows], flatWidths));
+      const widths=[1300,3360,1700,1500,1500]; // => 9360
+      rows.push(tableRow([ cell(day.titleFull,{bold:true,shade:DARK,span:5}) ]));
+      rows.push(tableRow([ cell("שעה",{bold:true,shade:HEAD}),cell("פעילות",{bold:true,shade:HEAD}),
+        cell("מיקום",{bold:true,shade:HEAD}),cell("גורם מעביר",{bold:true,shade:HEAD}),cell("הערות",{bold:true,shade:HEAD}) ]));
+      if(!data.rows.length) rows.push(tableRow([cell("",{}),cell("— אין פעילויות ביום זה —",{}),cell(""),cell(""),cell("")]));
+      for(const r of data.rows){
+        if(r.kind==="bat"){
+          rows.push(tableRow([ cell(r.label,{bold:true,shade: r.ev.start?DARK:WARN}),
+            cell(r.ev.cleanSummary,{bold:true,shade:DARK,span:4}) ]));
+        } else {
+          const e=r.ev;
+          rows.push(tableRow([
+            cell(r.label,{bold:true, shade: !e.start?WARN:null}),
+            cell(e.cleanSummary,{bold:true}),
+            cell(e.location,{shade: e.location===UNKNOWN_LOC?WARN:null}),
+            cell(e.giver||"", {align:"right"}),
+            cell(e.notes,{align:"right"})
+          ]));
+        }
+      }
+      return makeTable(rows, widths);
     }
-  });
-
-  /* ---- נספח ב' — לו"ז מקביל (ורוד) ופלס"ם (אפור), כלל #5 ---- */
-  const extraEvents=[];
-  parsedDays.forEach(d=> d.events.forEach(e=>{ if(e.track!=="main") extraEvents.push({day:d.label, e}); }));
-  if(extraEvents.length){
-    const PINK="F8CBDC", GRAYP="D9D9D9";
-    children.push(new D.Paragraph({pageBreakBefore:true, bidirectional:true, alignment:D.AlignmentType.RIGHT, children:[rtl("נספח ב' – לו\"ז מקביל ולו\"ז פלס\"ם",{bold:true,size:26,underline:{}})]}));
-    children.push(P(rtl("שויך לפי צבע האירוע ביומן: ורוד = לו\"ז מקביל (הסמכות/רענונים) · אפור = לו\"ז פלס\"ם.",{size:18})));
-    const hdr = tableRow([
-      cell("יום",{bold:true,shade:HEAD}), cell("שעה",{bold:true,shade:HEAD}),
-      cell("פעילות",{bold:true,shade:HEAD}), cell("מיקום",{bold:true,shade:HEAD}),
-      cell("סוג",{bold:true,shade:HEAD})
-    ]);
-    const rows = extraEvents.map(({day,e})=>{
-      const sh = e.track==="palsam" ? GRAYP : PINK;
-      return tableRow([
-        cell(day,{shade:sh}),
-        cell(e.timeRange||"כל היום",{shade:sh}),
-        cell(e.cleanSummary,{bold:true,shade:sh}),
-        cell(e.location,{shade:sh}),
-        cell(e.track==="palsam"?'פלס"ם':"מקביל",{bold:true,shade:sh})
-      ]);
-    });
-    children.push(makeTable([hdr,...rows], [1500,1300,4060,1500,1000]));
   }
 
-  /* ---- חתימה ---- */
-  children.push(P(rtl("",{size:10})));
-  children.push(P(rtl("בברכה,",{bold:true,size:22})));
-  textLines($("signer").value).forEach(l=>children.push(P(rtl(l,{bold:true,size:22}))));
+  /* ---- טבלת נספח (מקביל/פלס"ם) בפורמט מטריצת הסמכות-ורענונים ---- */
+  function appendixDocx(track){
+    const m=buildAppendixMatrix(track); if(!m) return null;
+    const nameFill = track==="parallel"?PINK:GRAYP;
+    const dayN=m.dayLabels.length;
+    const nameW=1900, fillW=[820,900,760,1080];
+    const dayW=Math.floor((FULLW - nameW - fillW.reduce((a,b)=>a+b,0))/dayN);
+    const widths=[nameW, ...m.dayLabels.map(()=>dayW), ...fillW];
+    const rows=[ tableRow([ cell("אימון",{bold:true,shade:HEAD}),
+      ...m.dayLabels.map(l=>cell(l,{bold:true,shade:HEAD})),
+      cell("מס' חיילים",{bold:true,shade:HEAD}),cell("מדריכה",{bold:true,shade:HEAD}),
+      cell("חונך",{bold:true,shade:HEAD}),cell("קצין אחראי",{bold:true,shade:HEAD}) ]) ];
+    for(const row of m.rows){
+      rows.push(tableRow([ cell(row.name,{bold:true,shade:nameFill}),
+        ...row.perDay.map(c=>cell(c)),
+        cell(""),cell("למלא"),cell("למלא"),cell("") ]));
+    }
+    return makeTable(rows, widths);
+  }
 
-  /* ---- בניית המסמך ---- */
+  /* ====== הרכבת המסמך — לו"ז בלבד ====== */
+  const battalion = $("battalion").value.trim() || "";
+  const children=[];
+  let first=true;
+  for(const day of parsedDays){
+    if(!day.events.some(e=>e.track==="main")) continue;
+    if(!first) children.push(new D.Paragraph({pageBreakBefore:true, children:[]}));
+    first=false;
+    children.push(luzTableDocx(day));
+  }
+
+  const par=appendixDocx("parallel");
+  if(par){
+    children.push(new D.Paragraph({pageBreakBefore:true, bidirectional:true, alignment:D.AlignmentType.RIGHT, spacing:{after:80}, children:[rtl('נספח – לו"ז מקביל',{bold:true,size:24,underline:{}})]}));
+    children.push(par);
+  }
+  const pal=appendixDocx("palsam");
+  if(pal){
+    children.push(new D.Paragraph({pageBreakBefore:true, bidirectional:true, alignment:D.AlignmentType.RIGHT, spacing:{after:80}, children:[rtl('נספח – לו"ז פלס"ם',{bold:true,size:24,underline:{}})]}));
+    children.push(pal);
+  }
+  if(!children.length) children.push(P(rtl('לא נמצאו אירועי לו"ז בטווח שנבחר.',{size:22})));
+
+  /* ---- בניית המסמך (A4 לאורך, כמו התבנית) ---- */
   const doc = new D.Document({
-    styles:{ default:{ document:{ run:{font:FONT,size:22} } } },
+    styles:{ default:{ document:{ run:{font:FONT,size:18} } } },
     sections:[{
       properties:{ page:{ size:{width:11906,height:16838}, margin:{top:1000,right:1000,bottom:1000,left:1000} } },
       children
@@ -977,10 +787,10 @@ async function exportDocx(){
     const blob = await D.Packer.toBlob(doc);
     const url = URL.createObjectURL(blob);
     const a=document.createElement("a");
-    a.href=url; a.download="פקא_גדוד_"+(battalion||"")+".docx";
+    a.href=url; a.download="לוז אימון גדוד "+(battalion||"")+".docx";
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
-    $("exportState").textContent="הפק\"א הופק והורד ✓";
+    $("exportState").textContent='הלו"ז הופק והורד ✓';
   }catch(e){ $("exportState").textContent="שגיאה ביצירת הקובץ: "+e.message; }
 }
 </script>
