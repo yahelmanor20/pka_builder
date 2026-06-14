@@ -105,6 +105,7 @@ window.addEventListener("load", function(){
   table.luz tr.daytitle td{background:#a6a6a6;color:#000;font-weight:700;font-size:14px;}
   table.luz tr.hdr th{background:#bfbfbf;color:#000;font-weight:700;}
   table.luz tr.batrow td{background:#a6a6a6;color:#000;font-weight:700;}
+  table.luz tr.parrow td{background:#f8cbdc;color:#000;font-weight:700;}
   table.luz td.timecell{font-weight:700;white-space:nowrap;}
   table.luz .loc{display:block;font-size:11px;color:#666;font-weight:400;margin-top:2px;}
   table.luz tr.batrow .loc{color:#333;}
@@ -214,6 +215,10 @@ window.addEventListener("load", function(){
   <!-- ===== ייצוא ===== -->
   <div class="card">
     <h2>4 · ייצוא לו"ז (Word)</h2>
+    <label style="display:flex;align-items:center;gap:6px;font-weight:normal;margin-bottom:8px">
+      <input type="checkbox" id="inlineParallel" />
+      שלב את הלו"ז המקביל גם בלו"ז היומי (הנספח יישאר תמיד)
+    </label>
     <div class="row">
       <button id="exportBtn">צור והורד פק"א (Word)</button>
       <span id="exportState" class="statusbar"></span>
@@ -513,9 +518,12 @@ function isAnchor(e){
   return /חד["״']?א|ארוח|ערב גדוד|מסדר|א["״.']?\s*[בצע]\b/.test((e.cleanSummary||e.summary||""));
 }
 function startKey(e){ return e.start || "99:99"; }
+function inlineParallelOn(){ return !!($("inlineParallel")||{}).checked; }
 
 function buildDayRows(day){
   const main = day.events.filter(e=>e.track==="main");
+  /* מתג: שילוב לו"ז מקביל (ורוד) כשורות ברוחב מלא בתוך הלו"ז היומי — הנספח נשאר תמיד */
+  const parEv = inlineParallelOn() ? day.events.filter(e=>e.track==="parallel") : [];
   if(day.isSplit){
     const plats = day.platoons;
     const batEv = main.filter(e=> !e.platoon);
@@ -528,12 +536,14 @@ function buildDayRows(day){
     }
     const rows = [];
     for(const e of batEv) rows.push({kind:"bat", start:startKey(e), label:e.timeRange||"כל היום", ev:e});
+    for(const e of parEv) rows.push({kind:"par", start:startKey(e), label:e.timeRange||"כל היום", ev:e});
     for(const k in groups){ const g=groups[k]; rows.push({kind:"split", start:g.start, label:g.label, cells:g.cells}); }
     rows.sort((a,b)=> a.start.localeCompare(b.start));
     return {kind:"split", plats, rows};
   } else {
-    const rows = main.slice().sort((a,b)=> startKey(a).localeCompare(startKey(b)))
-                     .map(e=> ({kind: isAnchor(e)?"bat":"normal", label:e.timeRange||"כל היום", ev:e}));
+    const rows = main.map(e=> ({kind: isAnchor(e)?"bat":"normal", start:startKey(e), label:e.timeRange||"כל היום", ev:e}))
+      .concat(parEv.map(e=> ({kind:"par", start:startKey(e), label:e.timeRange||"כל היום", ev:e})))
+      .sort((a,b)=> a.start.localeCompare(b.start));
     return {kind:"flat", rows};
   }
 }
@@ -569,26 +579,45 @@ function deriveRequirements(){
   const tr  = e => e.timeRange || "כל היום";
   const txt = e => (e.cleanSummary||e.summary||"").trim();
   const FIELD = /מטווח|9\s*א['׳]?|18\s*א['׳]?|יובל|לשביה|שטח אש|ירידה ל/;
+  const toMin = t => { const m=/(\d{1,2}):(\d{2})/.exec(t||""); return m?(+m[1]*60 + +m[2]):null; };
+  const fmtMin = v => String(Math.floor(v/60)).padStart(2,"0")+":"+String(v%60).padStart(2,"0");
+  const review = [];                       // פריטים שלא זוהו → הודעה גלויה למשתמש
+  const dayName = di => HE_DAYS[parsedDays[di].date.getDay()];
+  const WEAPONS = [["קלעים","קלעים"],["נגב","נגב"],["מטול","מטול"],['אלפ["״\']?ה',"אלפ\"ה"],
+                   ["מאג","מאג"],["צלפ","צלפים"],["רחפן","רחפנים"],["לאו","לאו"]];   // מילת-נשק → שם מטווח ייעודי
+  const AREAS = [["9\\s*א['׳]?","9א'"],["18\\s*א['׳]?","18א'"],["יובל 1","יובל 1"],
+                 ["יובלים","יובלים"],["לשביה חדשה","לשביה חדשה"],["לשביה ישנה","לשביה ישנה"],["לשביה","לשביה"]]; // ספציפי לפני כללי
 
   parsedDays.forEach((day,di)=>{
     const evs = day.events, plats = day.platoons.length;
     for(const e of evs){
       const s=txt(e), loc=(e.location&&e.location!==UNKNOWN_LOC)?e.location:"", blob=s+" "+loc;
       // --- בלוק עליון (גורמי מטה/גדוד) ---
-      if(/סדנת תו ?תקן|סיכום אימון|חניכ/.test(s))                               add(F.mbeit,di, s+" · "+tr(e));
+      if(/(סדנת|שיעור) תו ?תקן|סיכום אימון|חניכ/.test(s))                        add(F.mbeit,di, s+" · "+tr(e));
       if(/חד["״']?א|משיכ|ארוח|(^|[^א-ת])א[.׳'״"]?\s*[בצע]([^א-ת]|$)/.test(s)) add(F.mazon,di, s+" · "+tr(e));
       if(/סמב["״']?צ.*קשר|ליונט|מרחב חכם|חתימת ליונט|(^|[^א-ת])קשר([^א-ת]|$)/.test(s)) add(F.tikshuv,di, s+" · "+tr(e));
       if(/חובש|תאג["״']?ד|מע["״']?ר|רפואת אמת|חיפוק|טנ["״']?ץ/.test(s))           add(F.refua,di, s+" · "+tr(e));
-      if(/IMI/.test(s))                                                          add(F.imi,di, s+" · "+tr(e)+' · קפ"ק שעה לפני; אגמ"ק+רכב פינוי+כפכפים');
+      if(/IMI/.test(s)){ const st=toMin(e.start); add(F.imi,di, "מטווח "+tr(e)+(st!=null?(' · קפ"ק '+fmtMin(st-60)+"-"+fmtMin(st)):' · קפ"ק שעה לפני')); }
       if(/הכנה מנטאל/.test(s))                                                   add(F.ditiatro,di, (e.platoon?("פל' "+e.platoon+"' · "):"")+tr(e));
-      if(/פרש תורכי|מעצר|בית בהגנה|מעגל פתוח/.test(s))                           add(F.magnet,di, 'ערכות מגנ"ט — '+s+" · "+tr(e));
-      if(/לאו|נגב|קלעים|מטול|אלפ["״']?ה|רחפן|צלפ|איבו/.test(s) && (/הסמכ|רענון|לבנת|מדריכ/.test(s)||e.track!=="main"))
-                                                                                add(F.madrichot,di, s+" · "+tr(e)+(e.track==="parallel"?" (לו\"ז מקביל)":""));
+      // מגנ"ט: רשימת מפעילים מתוקנת; פרש תורכי רק כתרגיל (לא שיעור)
+      if(/תרגיל מסגרת|מעגל פתוח|מעגל פרוץ|זירה חמה|מעצר|בית בהגנה/.test(s) || (/פרש תורכי/.test(s) && /תרגיל/.test(s)))
+                                                                                add(F.magnet,di, 'ערכות מגנ"ט — '+s+" · "+tr(e));
+      // טכניקות → מדריך קרב מגע (תחת מדריכות לוחמה)
+      if(/טכניק/.test(s))                                                        add(F.madrichot,di, 'מדריך קרב מגע לטובת טכניקת בידוק · '+tr(e));
+      // מדריכות לוחמה + מטווח ייעודי לטובת הסמכה/רענון נשק; אחרת — דגל "לא זוהה"
+      const wpn = WEAPONS.find(([k])=> new RegExp(k).test(s));
+      if(wpn){
+        if(/הסמכ|רענון|לבנת|מדריכ/.test(s) || e.track!=="main"){
+          add(F.madrichot,di, s+" · "+tr(e)+(e.track==="parallel"?' (לו"ז מקביל)':""));
+          add(F.matvachim,di, "מטווח "+wpn[1]+" (לטובת "+s+") · "+tr(e));
+        } else if(!/מטווח|איפוס/.test(s)){
+          review.push(dayName(di)+': "'+s+'" — מכיל "'+wpn[1]+'" אך לא זוהתה הסמכה/רענון; בדוק ידנית.');
+        }
+      }
       // --- בלוק תחתון (פק"א של הבא"פ) ---
       if(/ערב גדוד|שיחת מג["״']?ד|שיחת מח["״']?ט|יוהל["״']?ם|הדלקת נרות|סיכום גדודי|שיחה גדודית/.test(s)) add(F.kitot,di,"אולם גדודי — "+s+" · "+tr(e));
       if(/נהיגה/.test(s))                                                        add(F.kitot,di,"כיתת נהיגה (קטנה) · "+tr(e));
       if(/סימולטור|מרחב חכם|תרחיש/.test(s))                                      add(F.simulator,di, s+" · "+tr(e));
-      if(/9\s*א['׳]?|18\s*א['׳]?|יובל|לשביה/.test(blob))                          add(F.shtachei,di, (loc||s)+" · "+tr(e));
     }
     // --- אגרגציות (ספירת משאבים מקבילים) ---
     if(plats>=2){
@@ -600,6 +629,21 @@ function deriveRequirements(){
     if(evs.some(e=>e.track==="palsam" && /מטווח|קלעים|נגב|איפוס/.test(txt(e)))) add(F.matvachim,di,'2 מטווחים לפלס"ם (עדיפות 7–14)');
     const fieldForces = evs.filter(e=>FIELD.test(txt(e)+" "+(e.location||"")));
     if(fieldForces.length) add(F.hovalot,di, Math.min(Math.max(fieldForces.length,2),4)+" טיוליות (ירידה/חזרה לשטח)");
+
+    // מזון — משיכות לטובת קלעים (הסמכה=30 איש; רענון=כל היום)
+    if(evs.some(e=>/קלעים/.test(txt(e)) && /הסמכ/.test(txt(e)))) add(F.mazon,di,'משיכת א.ב + א.צ + א.ע ל-30 איש (הסמכת קלעים)');
+    if(evs.some(e=>/קלעים/.test(txt(e)) && /רענון/.test(txt(e)))) add(F.mazon,di,'משיכת א.ב + א.צ + א.ע כל היום (רענון קלעים)');
+
+    // שטחי אש — תיאום לכל משך השהות (איחוד טווחי זמן לכל אזור)
+    const spans={};
+    for(const e of evs){
+      const hay = txt(e)+" "+(e.location||"");
+      const a = AREAS.find(([rx])=> new RegExp(rx).test(hay)); if(!a) continue;
+      const st=toMin(e.start); if(st==null) continue;
+      const en=toMin(e.end)!=null?toMin(e.end):st;
+      if(!spans[a[1]]) spans[a[1]]={min:st,max:en}; else { spans[a[1]].min=Math.min(spans[a[1]].min,st); spans[a[1]].max=Math.max(spans[a[1]].max,en); }
+    }
+    Object.keys(spans).forEach(name=> add(F.shtachei,di, name+" · "+fmtMin(spans[name].min)+"-"+fmtMin(spans[name].max)+" (תיאום לכל משך השהות)"));
   });
 
   // תחמושת: סכום כולל, מוצג ביום המטווח הראשון (או יום 1)
@@ -617,8 +661,8 @@ function deriveRequirements(){
   const bottom=[["כיתות",F.kitot],["סימולטור",F.simulator],["הובלות",F.hovalot],["שטחי אש",F.shtachei],["מטווחים",F.matvachim]];
   const used = arr => arr.filter(([n,cells])=> cells.some(c=>c.length)).map(([n,cells])=>({name:n,cells}));
   const t=used(top), b=used(bottom);
-  if(!t.length && !b.length) return null;
-  return {top:t, bottom:b, dayLabels:parsedDays.map(d=>HE_DAYS[d.date.getDay()])};
+  if(!t.length && !b.length && !review.length) return null;
+  return {top:t, bottom:b, review, dayLabels:parsedDays.map(d=>HE_DAYS[d.date.getDay()])};
 }
 
 function badgeHtml(e){
@@ -667,6 +711,11 @@ function renderPreview(){
     box.appendChild(head);
     if(req.top.length)    box.appendChild(renderReqTable("גורמי מטה / גדוד", req.top, req.dayLabels, "reqtop"));
     if(req.bottom.length) box.appendChild(renderReqTable('פק"א של הבא"פ (משאבי בא"פ)', req.bottom, req.dayLabels, "reqbot"));
+    if(req.review && req.review.length){
+      const rb=document.createElement("div"); rb.className="reviewbar";
+      rb.innerHTML='⚠ פריטים שלא זוהו אוטומטית — בדיקה ידנית:<br>'+req.review.map(esc).join("<br>");
+      box.appendChild(rb);
+    }
     host.appendChild(box);
   }
 }
@@ -698,8 +747,8 @@ function renderLuzTable(day){
   if(data.kind==="split"){
     html+=`<tr class="hdr"><th>שעה</th>`+data.plats.map(L=>`<th>פלוגה ${esc(L)}'</th>`).join("")+`</tr>`;
     for(const r of data.rows){
-      if(r.kind==="bat"){
-        html+=`<tr class="batrow"><td class="timecell">${esc(r.label)}</td>`+
+      if(r.kind==="bat" || r.kind==="par"){
+        html+=`<tr class="${r.kind==="par"?"parrow":"batrow"}"><td class="timecell">${esc(r.label)}</td>`+
               `<td colspan="${data.plats.length}">${esc(r.ev.cleanSummary)}${badgeHtml(r.ev)}</td></tr>`;
       } else {
         html+=`<tr><td class="timecell">${esc(r.label)}</td>`;
@@ -713,8 +762,8 @@ function renderLuzTable(day){
   } else {
     html+=`<tr class="hdr"><th>שעה</th><th>פעילות</th><th>מיקום</th><th>גורם מעביר</th><th>הערות</th></tr>`;
     for(const r of data.rows){
-      if(r.kind==="bat"){
-        html+=`<tr class="batrow"><td class="timecell">${esc(r.label)}</td>`+
+      if(r.kind==="bat" || r.kind==="par"){
+        html+=`<tr class="${r.kind==="par"?"parrow":"batrow"}"><td class="timecell">${esc(r.label)}</td>`+
               `<td colspan="4">${esc(r.ev.cleanSummary)}${badgeHtml(r.ev)}</td></tr>`;
       } else {
         const e=r.ev;
@@ -748,6 +797,7 @@ function esc(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":
 /* ===============  יצירת מסמך Word (docx)  ============== */
 /* ====================================================== */
 $("exportBtn").addEventListener("click", exportDocx);
+$("inlineParallel").addEventListener("change", ()=>{ if(parsedDays.length) renderPreview(); });
 
 async function exportDocx(){
   if(typeof docx==="undefined"){ alert("ספריית יצירת ה-Word עדיין נטענת, נסה שוב."); return; }
@@ -800,7 +850,10 @@ async function exportDocx(){
       rows.push(tableRow([ cell(day.titleFull,{bold:true,shade:DARK,span:nCol}) ]));
       rows.push(tableRow([ cell("שעה",{bold:true,shade:HEAD}), ...plats.map(L=>cell("פלוגה "+L+"'",{bold:true,shade:HEAD})) ]));
       for(const r of data.rows){
-        if(r.kind==="bat"){
+        if(r.kind==="par"){
+          rows.push(tableRow([ cell(r.label,{bold:true,shade:PINK}),
+            cell(r.ev.cleanSummary,{bold:true,shade:PINK,span:plats.length}) ]));
+        } else if(r.kind==="bat"){
           rows.push(tableRow([ cell(r.label,{bold:true,shade: r.ev.start?DARK:WARN}),
             cell(r.ev.cleanSummary,{bold:true,shade:DARK,span:plats.length}) ]));
         } else {
@@ -821,7 +874,10 @@ async function exportDocx(){
         cell("מיקום",{bold:true,shade:HEAD}),cell("גורם מעביר",{bold:true,shade:HEAD}),cell("הערות",{bold:true,shade:HEAD}) ]));
       if(!data.rows.length) rows.push(tableRow([cell("",{}),cell("— אין פעילויות ביום זה —",{}),cell(""),cell(""),cell("")]));
       for(const r of data.rows){
-        if(r.kind==="bat"){
+        if(r.kind==="par"){
+          rows.push(tableRow([ cell(r.label,{bold:true,shade:PINK}),
+            cell(r.ev.cleanSummary,{bold:true,shade:PINK,span:4}) ]));
+        } else if(r.kind==="bat"){
           rows.push(tableRow([ cell(r.label,{bold:true,shade: r.ev.start?DARK:WARN}),
             cell(r.ev.cleanSummary,{bold:true,shade:DARK,span:4}) ]));
         } else {
@@ -907,6 +963,11 @@ async function exportDocx(){
       new D.Paragraph({bidirectional:true, alignment:D.AlignmentType.RIGHT, spacing:{after:120}, children:[rtl('נגזר אוטומטית מהלו"ז לפי כללי הגזירה — לאימות והשלמה ע"י המפ"ץ.',{size:18})]}) ];
     if(req.top.length){ reqChildren.push(reqBlockDocx("גורמי מטה / גדוד", req.top, req.dayLabels, "9DC3E6")); reqChildren.push(P(rtl("",{size:10}))); }
     if(req.bottom.length){ reqChildren.push(reqBlockDocx('פק"א של הבא"פ (משאבי בא"פ)', req.bottom, req.dayLabels, "A9D08E")); }
+    if(req.review && req.review.length){
+      reqChildren.push(P(rtl("",{size:10})));
+      reqChildren.push(new D.Paragraph({bidirectional:true, alignment:D.AlignmentType.RIGHT, spacing:{before:80,after:40}, children:[rtl('⚠ פריטים שלא זוהו אוטומטית — בדיקה ידנית:',{bold:true,size:20})]}));
+      req.review.forEach(t=> reqChildren.push(P(rtl(t,{size:18}))));
+    }
     sections.push({
       properties:{ page:{ size:{width:11906,height:16838,orientation:D.PageOrientation.LANDSCAPE}, margin:{top:800,right:800,bottom:800,left:800} } },
       children:reqChildren
