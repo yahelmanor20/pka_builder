@@ -75,6 +75,9 @@ window.addEventListener("load", function(){
   .pill.ok{background:rgba(31,157,77,.14);color:var(--ok);}
   .pill.bad{background:rgba(217,59,52,.12);color:var(--bad);}
   .hint{font-size:12px;color:var(--muted);margin-top:6px;}
+  .notice{font-size:12.5px;line-height:1.55;margin-top:12px;padding:10px 12px;border-radius:8px;
+    background:rgba(31,127,196,.08);border:1px solid rgba(31,127,196,.30);color:#2a4a63;}
+  [data-theme="dark"] .notice{background:rgba(58,155,220,.10);border-color:rgba(58,155,220,.35);color:#cfe0ee;}
   .daybox{border:1px solid var(--line);border-radius:10px;margin:10px 0;overflow:hidden;}
   .dayhead{background:var(--panel2);padding:9px 13px;font-weight:700;font-size:14px;color:#15202d;}
   table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;}
@@ -162,6 +165,11 @@ window.addEventListener("load", function(){
       <button id="connectBtn">התחבר לחשבון Google</button>
       <span id="authState" class="pill bad">לא מחובר</span>
     </div>
+    <div class="notice">
+      בחיבור הראשון Google עשויה להציג מסך <b>"Google hasn't verified this app"</b> — זה תקין.
+      לחץ <b>Advanced</b> (מתקדם) → <b>Go to yahelmanor20.github.io (unsafe)</b> → <b>Continue</b>,
+      ואז אשר גישת <b>קריאה בלבד</b> ליומן. שום מידע לא נשלח לשרת חיצוני — הכול רץ בדפדפן שלך.
+    </div>
   </div>
 
   <!-- ===== בחירת שבוע ===== -->
@@ -225,18 +233,27 @@ window.addEventListener("load", function(){
     <div class="hint">הקובץ כולל את הלו"ז היומי, לו"ז מקביל, לו"ז פלס"ם (בפורמט התבנית), ובסוף — נספח דרישות אימון נגזר אוטומטית (לרוחב). שאר הסעיפים המילוליים ממולאים ידנית.</div>
   </div>
 
-  <!-- ===== הגדרה ===== -->
+  <!-- ===== עזרה ===== -->
   <div class="card">
-    <h2>הגדרת חיבור Google (חד-פעמי)</h2>
+    <h2>חיבור ראשון — מה לצפות</h2>
     <ol class="steps">
-      <li>היכנס ל-<code>console.cloud.google.com</code> וצור פרויקט.</li>
-      <li>ב-APIs &amp; Services → Library, הפעל את <code>Google Calendar API</code>.</li>
-      <li>ב-OAuth consent screen הגדר אפליקציה (External) והוסף את עצמך כ-Test user.</li>
-      <li>ב-Credentials → Create credentials → OAuth client ID → סוג <code>Web application</code>.</li>
-      <li>תחת Authorized JavaScript origins הוסף את הכתובת שבה רץ הקובץ (למשל <code>http://localhost:8000</code> או דומיין הארגון).</li>
-      <li>העתק את ה-Client ID והדבק בשדה למעלה.</li>
+      <li>לחץ <b>"התחבר לחשבון Google"</b> ובחר את חשבון ה-Google שלך.</li>
+      <li>אם מופיע מסך <b>"Google hasn't verified this app"</b> — לחץ <b>Advanced</b> → <b>Go to yahelmanor20.github.io (unsafe)</b> → <b>Continue</b>. זה תקין.</li>
+      <li>אשר את הרשאת <b>הקריאה ליומן</b> (calendar.readonly).</li>
+      <li>בחר יומן ושבוע → "משוך אירועים" → "צור והורד פק"א".</li>
     </ol>
     <div class="hint">החיבור דורש הרשאת קריאה בלבד ליומן (<code>calendar.readonly</code>). שום מידע אינו נשלח לשרת חיצוני — הכול רץ בדפדפן.</div>
+    <details style="margin-top:10px">
+      <summary>הגדרת מפתח (חד-פעמי, לא נדרש למפקצים)</summary>
+      <ol class="steps" style="margin-top:8px">
+        <li><code>console.cloud.google.com</code> → צור פרויקט.</li>
+        <li>APIs &amp; Services → Library → הפעל <code>Google Calendar API</code>.</li>
+        <li>OAuth consent screen → External → Publish (Production).</li>
+        <li>Credentials → OAuth client ID → <code>Web application</code>.</li>
+        <li>Authorized JavaScript origins → <code>https://yahelmanor20.github.io</code>.</li>
+        <li>העתק את ה-Client ID ל-<code>DEFAULT_CLIENT_ID</code> בקוד (או לשדה למעלה כ-override).</li>
+      </ol>
+    </details>
   </div>
 
 </div>
@@ -364,7 +381,7 @@ async function gcal(path){
     if(r.status===403 && /accessNotConfigured|SERVICE_DISABLED/i.test(reason+msg))
       hint = " — נראה ש-Google Calendar API לא מופעל בפרויקט. הפעל אותו ב-Cloud Console → APIs & Services → Library → Google Calendar API → Enable.";
     else if(r.status===403)
-      hint = " — נראה שההרשאה ליומן לא אושרה. התנתק והתחבר מחדש ואשר את הרשאת הקריאה ליומן (calendar.readonly), וודא שאתה רשום כ-Test user במסך ההסכמה.";
+      hint = " — נראה שההרשאה ליומן לא אושרה. התנתק והתחבר מחדש, ובמסך ההסכמה אשר את הרשאת הקריאה ליומן (calendar.readonly).";
     console.error("Calendar API error", r.status, reason, msg);
     throw new Error("Calendar API "+r.status+(reason?(" ["+reason+"]"):"")+(msg?(" — "+msg):"")+hint);
   }
