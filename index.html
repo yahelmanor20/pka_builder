@@ -107,8 +107,7 @@ window.addEventListener("load", function(){
   table.luz tr.batrow td{background:#a6a6a6;color:#000;font-weight:700;}
   table.luz tr.parrow td{background:#f8cbdc;color:#000;font-weight:700;}
   table.luz td.timecell{font-weight:700;white-space:nowrap;}
-  table.luz .loc{display:block;font-size:11px;color:#666;font-weight:400;margin-top:2px;}
-  table.luz tr.batrow .loc{color:#333;}
+  table.luz .loc{display:block;font-weight:700;color:#000;margin-top:2px;}
   /* --- נספח: לו"ז מקביל (ורוד) / פלס"ם (אפור) — כלל #5 --- */
   table.appx tr.hdr th{background:#bfbfbf;color:#000;}
   table.appx td.name{background:#bfbfbf;color:#000;font-weight:700;}
@@ -521,9 +520,10 @@ function startKey(e){ return e.start || "99:99"; }
 function inlineParallelOn(){ return !!($("inlineParallel")||{}).checked; }
 
 function buildDayRows(day){
-  const main = day.events.filter(e=>e.track==="main");
+  /* אירועי "כל היום" (ללא שעה) לא נכללים בלו"ז המיוצא */
+  const main = day.events.filter(e=>e.track==="main" && e.start);
   /* מתג: שילוב לו"ז מקביל (ורוד) כשורות ברוחב מלא בתוך הלו"ז היומי — הנספח נשאר תמיד */
-  const parEv = inlineParallelOn() ? day.events.filter(e=>e.track==="parallel") : [];
+  const parEv = inlineParallelOn() ? day.events.filter(e=>e.track==="parallel" && e.start) : [];
   if(day.isSplit){
     const plats = day.platoons;
     const batEv = main.filter(e=> !e.platoon);
@@ -770,7 +770,7 @@ function renderLuzTable(day){
         const e=r.ev;
         html+=`<tr${e.issues.length?' class="warn"':''}><td class="timecell">${esc(r.label)}</td>`+
               `<td>${esc(e.cleanSummary)}${badgeHtml(e)}</td>`+
-              `<td${e.location===UNKNOWN_LOC?' class="miss"':''}>${esc(e.location)}</td>`+
+              `<td${e.location===UNKNOWN_LOC?' class="miss"':''}><strong>${esc(e.location)}</strong></td>`+
               `<td>${esc(e.giver||"—")}</td><td>${esc(e.notes)}</td></tr>`;
       }
     }
@@ -814,18 +814,20 @@ async function exportDocx(){
   const P = (children, opt={}) => new D.Paragraph({bidirectional:true, alignment:D.AlignmentType.RIGHT, children:Array.isArray(children)?children:[children], ...opt});
   const textLines = (s) => (s===null||s===undefined?"":String(s)).split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
 
-  /* תא טבלה בסגנון התבנית: David sz18, ממורכז אנכית, RTL */
+  /* תא טבלה בסגנון התבנית: David sz18, ממורכז אנכית, RTL.
+     text יכול להיות מחרוזת (bold אחיד) או מערך [{text,bold}] לעיצוב פר-שורה */
   function cell(text, {bold=false, shade=null, span=null, align="center"}={}){
     const al = align==="right"?D.AlignmentType.RIGHT:D.AlignmentType.CENTER;
-    const ls = textLines(text);
+    const parts = Array.isArray(text)
+      ? text
+      : textLines(text).map(t=>({text:t, bold}));
+    if(!parts.length) parts.push({text:"", bold});
     return new D.TableCell({
       columnSpan: span||undefined,
       verticalAlign: D.VerticalAlign.CENTER,
       shading: shade?{fill:shade,type:D.ShadingType.CLEAR,color:"auto"}:undefined,
       margins:{top:30,bottom:30,left:80,right:80},
-      children: ls.length
-        ? ls.map(line=> new D.Paragraph({bidirectional:true, alignment:al, children:[rtl(line,{bold,size:18})]}))
-        : [new D.Paragraph({bidirectional:true, alignment:al, children:[rtl("",{size:18})]})]
+      children: parts.map(p=> new D.Paragraph({bidirectional:true, alignment:al, children:[rtl(p.text,{bold:!!p.bold,size:18})]}))
     });
   }
   const tableRow = cells => new D.TableRow({children:cells});
@@ -861,8 +863,9 @@ async function exportDocx(){
           const cells=[ cell(r.label,{bold:true}) ];
           for(const L of plats){
             const evs=r.cells[L]||[];
-            const txt = evs.map(e=> e.cleanSummary+"\n"+e.location).join("\n");
-            cells.push(cell(txt));
+            const lines=[];
+            evs.forEach(e=>{ lines.push({text:e.cleanSummary,bold:false}); lines.push({text:e.location,bold:true}); });
+            cells.push(cell(lines.length?lines:"—"));
           }
           rows.push(tableRow(cells));
         }
@@ -886,7 +889,7 @@ async function exportDocx(){
           rows.push(tableRow([
             cell(r.label,{bold:true, shade: !e.start?WARN:null}),
             cell(e.cleanSummary,{bold:true}),
-            cell(e.location,{shade: e.location===UNKNOWN_LOC?WARN:null}),
+            cell(e.location,{bold:true, shade: e.location===UNKNOWN_LOC?WARN:null}),
             cell(e.giver||"", {align:"right"}),
             cell(e.notes,{align:"right"})
           ]));
