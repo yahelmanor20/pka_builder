@@ -5,7 +5,7 @@
   בלוק כותרת · הנידון · כללי · הנחות יסוד · גורמים משפיעים · מטרת האימון ·
   הישגים נדרשים · סד"כ רענונים · גאנט · מיסים · תדריכים · חלוקת אחריות (9 גורמים) ·
   זמני ארוחות · נספח א' לו"ז יומי (טבלה ליום) · נספח ב' הסמכות · חתימה.
-עיצוב: David 11 · כותרות כחולות 1F4E79 · אפורים BFBFBF/A6A6A6 · טבלאות רוחב מלא · RTL.
+עיצוב (template_v2): Segoe UI · אקסנט בורדו 8C3A3A · כותרות 595959/333333 (טקסט לבן) · גוף 262626 · RTL.
 הבוילרפלייט הסטנדרטי נשמר מהתבנית; הלו"ז/רענונים/ארוחות ממולאים מנתוני האימון.
 """
 import os
@@ -18,9 +18,12 @@ from docx.oxml import OxmlElement
 
 HERE = os.path.dirname(__file__)
 TEMPLATE = os.path.join(HERE, "..", "pka_template.docx")
-GRAY_HEAD, GRAY_DARK = "BFBFBF", "A6A6A6"
-BLUE = RGBColor(0x1F, 0x4E, 0x79)
-FONT = "David"
+# עיצוב template_v2: כותרות אפורות כהות (טקסט לבן), אקסנט בורדו, גוף 262626, Segoe UI
+GRAY_HEAD, GRAY_DARK = "595959", "333333"   # כותרת-עמודות / כותרת-יום (טקסט לבן)
+ACCENT = RGBColor(0x8C, 0x3A, 0x3A)         # בורדו (היה כחול 1F4E79)
+WHITE = RGBColor(0xFF, 0xFF, 0xFF)
+BODY = RGBColor(0x26, 0x26, 0x26)
+FONT = "Segoe UI"
 FULL_W = 9360  # twips — רוחב טבלה מלא (כמו התבנית)
 
 
@@ -33,8 +36,7 @@ def _el(tag, **a):
 
 def _run(run, size=11, bold=False, color=None):
     run.font.name = FONT; run.font.size = Pt(size); run.font.bold = bold
-    if color is not None:
-        run.font.color.rgb = color
+    run.font.color.rgb = color if color is not None else BODY
     rPr = run._element.get_or_add_rPr()
     rf = rPr.find(qn("w:rFonts"))
     if rf is None:
@@ -77,7 +79,7 @@ def hdr(doc, text, bold=False, size=10):
 def title(doc, text, size=13, space_before=6):
     p = doc.add_paragraph(); _prtl(p)
     p.paragraph_format.space_before = Pt(space_before); p.paragraph_format.space_after = Pt(3)
-    _run(p.add_run(text), size=size, bold=True, color=BLUE)
+    _run(p.add_run(text), size=size, bold=True, color=ACCENT)
 
 
 def bullet(doc, text, size=10.5):
@@ -119,7 +121,7 @@ def grid_table(doc, headers, rows, weights=None):
     t.alignment = WD_TABLE_ALIGNMENT.RIGHT
     t._tbl.tblPr.append(_el("w:bidiVisual")); _borders(t)
     for j, h in enumerate(headers):
-        _cell(t.rows[0].cells[j], h, bold=True, size=10, fill=GRAY_HEAD, center=True); _vcenter(t.rows[0].cells[j])
+        _cell(t.rows[0].cells[j], h, bold=True, size=10, fill=GRAY_HEAD, color=WHITE, center=True); _vcenter(t.rows[0].cells[j])
     for row in rows:
         cells = t.add_row().cells
         for j, v in enumerate(row):
@@ -136,10 +138,10 @@ def day_table(doc, day_title, headers, rows, weights=None, fill=False):
     m = t.rows[0].cells[0]
     for c in t.rows[0].cells[1:]:
         m = m.merge(c)
-    _cell(m, day_title, bold=True, size=11, fill=GRAY_DARK, center=True); _vcenter(m)
+    _cell(m, day_title, bold=True, size=11, fill=GRAY_DARK, color=WHITE, center=True); _vcenter(m)
     hr = t.add_row().cells
     for j, h in enumerate(headers):
-        _cell(hr[j], h, bold=True, size=10, fill=GRAY_HEAD, center=True); _vcenter(hr[j])
+        _cell(hr[j], h, bold=True, size=10, fill=GRAY_HEAD, color=WHITE, center=True); _vcenter(hr[j])
     for row in rows:
         cells = t.add_row().cells
         for j, v in enumerate(row):
@@ -171,10 +173,10 @@ def luz_split_day(doc, day_title, rows, fill=True):
     m = t.rows[0].cells[0]
     for c in t.rows[0].cells[1:]:
         m = m.merge(c)
-    _cell(m, day_title, bold=True, size=11, fill=GRAY_DARK, center=True); _vcenter(m)
+    _cell(m, day_title, bold=True, size=11, fill=GRAY_DARK, color=WHITE, center=True); _vcenter(m)
     hr = t.add_row().cells
     for j, h in enumerate(H_SPLIT):
-        _cell(hr[j], h, bold=True, size=10, fill=GRAY_HEAD, center=True); _vcenter(hr[j])
+        _cell(hr[j], h, bold=True, size=10, fill=GRAY_HEAD, color=WHITE, center=True); _vcenter(hr[j])
     for r in rows:
         cells = t.add_row().cells
         _cell(cells[0], r[1], size=10, center=True); _vcenter(cells[0])

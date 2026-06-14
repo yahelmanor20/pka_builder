@@ -105,15 +105,15 @@ window.addEventListener("load", function(){
   .splittag{font-size:11px;color:var(--accent2);margin-inline-start:8px;}
   /* --- טבלאות לו"ז בסגנון התבנית (1:1 עם pka_template) --- */
   table.luz td, table.luz th{text-align:center;vertical-align:middle;}
-  table.luz tr.daytitle td{background:#a6a6a6;color:#000;font-weight:700;font-size:14px;}
-  table.luz tr.hdr th{background:#bfbfbf;color:#000;font-weight:700;}
-  table.luz tr.batrow td{background:#a6a6a6;color:#000;font-weight:700;}
+  table.luz tr.daytitle td{background:#333333;color:#fff;font-weight:700;font-size:14px;}
+  table.luz tr.hdr th{background:#595959;color:#fff;font-weight:700;}
+  table.luz tr.batrow td{background:#fff;color:#262626;font-weight:700;}
   table.luz tr.parrow td{background:#f8cbdc;color:#000;font-weight:700;}
   table.luz td.timecell{font-weight:700;white-space:nowrap;}
   table.luz .loc{display:block;font-weight:700;color:#000;margin-top:2px;}
   /* --- נספח: לו"ז מקביל (ורוד) / פלס"ם (אפור) — כלל #5 --- */
-  table.appx tr.hdr th{background:#bfbfbf;color:#000;}
-  table.appx td.name{background:#bfbfbf;color:#000;font-weight:700;}
+  table.appx tr.hdr th{background:#595959;color:#fff;}
+  table.appx td.name{background:#595959;color:#fff;font-weight:700;}
   table.appx.parallel tr.hdr th, table.appx.parallel td.name{background:#f8cbdc;}
   table.appx.palsam   tr.hdr th, table.appx.palsam   td.name{background:#d9d9d9;}
   /* --- דרישות אימון: שני בלוקים צבעוניים --- */
@@ -121,7 +121,7 @@ window.addEventListener("load", function(){
   table.req tr.blocktitle td{font-weight:700;color:#13202d;text-align:center;font-size:14px;padding:8px;}
   table.req.reqtop tr.blocktitle td{background:#9dc3e6;}
   table.req.reqbot tr.blocktitle td{background:#a9d08e;}
-  table.req tr.hdr th{background:#bfbfbf;color:#000;}
+  table.req tr.hdr th{background:#595959;color:#fff;}
   table.req td.name{background:#e7e6e6;font-weight:700;white-space:nowrap;}
   .legend{font-size:12px;color:var(--muted);margin:6px 0 0;}
   .legend .sw{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-inline-start:4px;}
@@ -498,8 +498,12 @@ function buildDays(items, start, nDays){
     if(colorPl && titlePl && titlePl.letter!==colorPl)
       notes = (notes?notes+" · ":"") + "בכותרת נכתב: פלוגה "+titlePl.letter+"' (שויך לפי צבע)";
 
+    /* ארוחות: "א.ב/א.צ/א.ע - חד"א|משיכה" → הטקסט שאחרי המקף הוא המיקום */
+    const meal = summary.match(/^\s*(א\.?[בצע])\s*[-–—]\s*(.+?)\s*$/);
+    const mealLoc = meal ? meal[2].trim() : "";
+
     /* כלל #4: טכניקות/תרגולות — מצרפים את כל טקסט התיאור לפעילות */
-    let cleanSummary = (titlePl && titlePl.activity) ? titlePl.activity : summary;
+    let cleanSummary = (titlePl && titlePl.activity) ? titlePl.activity : (meal ? meal[1] : summary);
     if(/טכניק|תרגול/.test(summary+" "+(ev.description||"")) && ev.description){
       const full = ev.description.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).join(" · ");
       if(full) cleanSummary += " ("+full+")";
@@ -513,7 +517,7 @@ function buildDays(items, start, nDays){
       platoon: platoon,
       colorId: colorId,
       track: track,
-      location: (ev.location||meta.locOverride||"").trim() || UNKNOWN_LOC,
+      location: (ev.location||meta.locOverride||mealLoc||"").trim() || UNKNOWN_LOC,
       giver: meta.giver||"",
       notes: notes
     };
@@ -827,20 +831,23 @@ async function exportDocx(){
   if(typeof docx==="undefined"){ alert("ספריית יצירת ה-Word עדיין נטענת, נסה שוב."); return; }
   $("exportState").textContent="בונה מסמך…";
   const D = docx;
-  const FONT="David";          // לפי התבנית
+  const FONT="Segoe UI";       // עיצוב template_v2
   const FULLW=9360;            // רוחב טבלה מלא (twips) — כמו התבנית (~9351)
-  const DARK="A6A6A6", HEAD="BFBFBF", WARN="FFF2CC";
-  const PINK="F8CBDC", GRAYP="D9D9D9";
+  const DARK="333333", HEAD="595959", WARN="FFF2CC";   // v2: כותרת-יום / כותרת-עמודות (טקסט לבן)
+  const PINK="F8CBDC", GRAYP="D9D9D9", ACCENT="8C3A3A", BODY="262626";
 
   /* helpers */
   const rtl = (text, opt={}) => new D.TextRun({text, rightToLeft:true, font:FONT, ...opt});
   const P = (children, opt={}) => new D.Paragraph({bidirectional:true, alignment:D.AlignmentType.RIGHT, children:Array.isArray(children)?children:[children], ...opt});
   const textLines = (s) => (s===null||s===undefined?"":String(s)).split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
 
-  /* תא טבלה בסגנון התבנית: David sz18, ממורכז אנכית, RTL.
-     text יכול להיות מחרוזת (bold אחיד) או מערך [{text,bold}] לעיצוב פר-שורה */
+  /* תא טבלה (עיצוב v2: Segoe UI sz18, ממורכז אנכית, RTL).
+     text יכול להיות מחרוזת (bold אחיד) או מערך [{text,bold}] לעיצוב פר-שורה.
+     על רקע כהה (DARK/HEAD/ACCENT) הטקסט הופך אוטומטית ללבן. */
   function cell(text, {bold=false, shade=null, span=null, align="center"}={}){
     const al = align==="right"?D.AlignmentType.RIGHT:D.AlignmentType.CENTER;
+    const onDark = shade && [DARK,HEAD,ACCENT].includes(shade);
+    const txtColor = onDark ? "FFFFFF" : BODY;
     const parts = Array.isArray(text)
       ? text
       : textLines(text).map(t=>({text:t, bold}));
@@ -850,7 +857,7 @@ async function exportDocx(){
       verticalAlign: D.VerticalAlign.CENTER,
       shading: shade?{fill:shade,type:D.ShadingType.CLEAR,color:"auto"}:undefined,
       margins:{top:30,bottom:30,left:80,right:80},
-      children: parts.map(p=> new D.Paragraph({bidirectional:true, alignment:al, children:[rtl(p.text,{bold:!!p.bold,size:18})]}))
+      children: parts.map(p=> new D.Paragraph({bidirectional:true, alignment:al, children:[rtl(p.text,{bold:!!p.bold,size:18,color:txtColor})]}))
     });
   }
   const tableRow = cells => new D.TableRow({children:cells});
@@ -880,8 +887,8 @@ async function exportDocx(){
           rows.push(tableRow([ cell(r.label,{bold:true,shade:PINK}),
             cell(r.ev.cleanSummary,{bold:true,shade:PINK,span:plats.length}) ]));
         } else if(r.kind==="bat"){
-          rows.push(tableRow([ cell(r.label,{bold:true,shade: r.ev.start?DARK:WARN}),
-            cell(r.ev.cleanSummary,{bold:true,shade:DARK,span:plats.length}) ]));
+          rows.push(tableRow([ cell(r.label,{bold:true,shade: r.ev.start?null:WARN}),
+            cell(r.ev.cleanSummary,{bold:true,span:plats.length}) ]));
         } else {
           const cells=[ cell(r.label,{bold:true}) ];
           for(const L of plats){
@@ -905,8 +912,8 @@ async function exportDocx(){
           rows.push(tableRow([ cell(r.label,{bold:true,shade:PINK}),
             cell(r.ev.cleanSummary,{bold:true,shade:PINK,span:4}) ]));
         } else if(r.kind==="bat"){
-          rows.push(tableRow([ cell(r.label,{bold:true,shade: r.ev.start?DARK:WARN}),
-            cell(r.ev.cleanSummary,{bold:true,shade:DARK,span:4}) ]));
+          rows.push(tableRow([ cell(r.label,{bold:true,shade: r.ev.start?null:WARN}),
+            cell(r.ev.cleanSummary,{bold:true,span:4}) ]));
         } else {
           const e=r.ev;
           rows.push(tableRow([
@@ -1013,7 +1020,7 @@ async function exportDocx(){
   const principle=buildPrincipleSchedule();
   if(principle.length){
     children.push(new D.Paragraph({bidirectional:true, alignment:D.AlignmentType.RIGHT, spacing:{after:60},
-      children:[rtl('לו"ז עקרוני',{bold:true,size:26,underline:{}})]}));
+      children:[rtl('לו"ז עקרוני',{bold:true,size:26,underline:{},color:ACCENT})]}));
     children.push(new D.Paragraph({bidirectional:true, alignment:D.AlignmentType.RIGHT, spacing:{after:120},
       children:[rtl('שלוש הפעילויות העיקריות בכל יום — סקירת השבוע.',{size:18})]}));
     children.push(principleTableDocx(principle));
@@ -1028,12 +1035,12 @@ async function exportDocx(){
 
   const par=appendixDocx("parallel");
   if(par){
-    children.push(new D.Paragraph({pageBreakBefore:true, bidirectional:true, alignment:D.AlignmentType.RIGHT, spacing:{after:80}, children:[rtl('נספח – לו"ז מקביל',{bold:true,size:24,underline:{}})]}));
+    children.push(new D.Paragraph({pageBreakBefore:true, bidirectional:true, alignment:D.AlignmentType.RIGHT, spacing:{after:80}, children:[rtl('נספח – לו"ז מקביל',{bold:true,size:24,underline:{},color:ACCENT})]}));
     children.push(par);
   }
   const pal=appendixDocx("palsam");
   if(pal){
-    children.push(new D.Paragraph({pageBreakBefore:true, bidirectional:true, alignment:D.AlignmentType.RIGHT, spacing:{after:80}, children:[rtl('נספח – לו"ז פלס"ם',{bold:true,size:24,underline:{}})]}));
+    children.push(new D.Paragraph({pageBreakBefore:true, bidirectional:true, alignment:D.AlignmentType.RIGHT, spacing:{after:80}, children:[rtl('נספח – לו"ז פלס"ם',{bold:true,size:24,underline:{},color:ACCENT})]}));
     children.push(pal);
   }
   if(!children.length) children.push(P(rtl('לא נמצאו אירועי לו"ז בטווח שנבחר.',{size:22})));
@@ -1045,7 +1052,7 @@ async function exportDocx(){
   }];
   const req = deriveRequirements();
   if(req){
-    const reqChildren=[ new D.Paragraph({bidirectional:true, alignment:D.AlignmentType.RIGHT, spacing:{after:80}, children:[rtl('נספח – דרישות אימון',{bold:true,size:26,underline:{}})]}),
+    const reqChildren=[ new D.Paragraph({bidirectional:true, alignment:D.AlignmentType.RIGHT, spacing:{after:80}, children:[rtl('נספח – דרישות אימון',{bold:true,size:26,underline:{},color:ACCENT})]}),
       new D.Paragraph({bidirectional:true, alignment:D.AlignmentType.RIGHT, spacing:{after:120}, children:[rtl('נגזר אוטומטית מהלו"ז לפי כללי הגזירה — לאימות והשלמה ע"י המפ"ץ.',{size:18})]}) ];
     if(req.top.length){ reqChildren.push(reqBlockDocx("גורמי מטה / גדוד", req.top, req.dayLabels, "9DC3E6")); reqChildren.push(P(rtl("",{size:10}))); }
     if(req.bottom.length){ reqChildren.push(reqBlockDocx('פק"א של הבא"פ (משאבי בא"פ)', req.bottom, req.dayLabels, "A9D08E")); }
@@ -1062,7 +1069,7 @@ async function exportDocx(){
 
   /* ---- בניית המסמך (לו"ז A4 לאורך · דרישות לרוחב) ---- */
   const doc = new D.Document({
-    styles:{ default:{ document:{ run:{font:FONT,size:18} } } },
+    styles:{ default:{ document:{ run:{font:FONT,size:18,color:BODY} } } },
     sections
   });
 
