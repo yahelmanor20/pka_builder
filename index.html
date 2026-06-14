@@ -157,7 +157,7 @@ window.addEventListener("load", function(){
     <h2>1 · חיבור לגוגל קלנדר</h2>
     <label>Google OAuth Client ID</label>
     <input id="clientId" placeholder="xxxxxxxx.apps.googleusercontent.com" />
-    <div class="hint">מזהה חד-פעמי שמפיקים בקונסולת Google Cloud. נשמר מקומית בדפדפן בלבד. הסבר מלא בתחתית העמוד.</div>
+    <div class="hint">מזהה מובנה — אין צורך לשנות. פשוט לחץ "התחבר לחשבון Google". (אפשר לעקוף עם מזהה אחר במידת הצורך.)</div>
     <div class="row" style="margin-top:12px">
       <button id="connectBtn">התחבר לחשבון Google</button>
       <span id="authState" class="pill bad">לא מחובר</span>
@@ -268,9 +268,15 @@ $("themeToggle").addEventListener("click", () => {
   applyTheme(next);
 });
 
-/* שמירת Client ID מקומית */
-$("clientId").value = localStorage.getItem("pka_client_id") || "";
-$("clientId").addEventListener("change", e => localStorage.setItem("pka_client_id", e.target.value.trim()));
+/* Client ID מובנה (מזהה ציבורי, מוגן ע"י Authorized JavaScript origins ביומן).
+   ניתן לעקוף ידנית בשדה — override נשמר מקומית. */
+const DEFAULT_CLIENT_ID = "257231988395-f9dl93bp6pomk03goevsbt08lb2a2g0s.apps.googleusercontent.com";
+$("clientId").value = localStorage.getItem("pka_client_id") || DEFAULT_CLIENT_ID;
+$("clientId").addEventListener("change", e => {
+  const v = e.target.value.trim();
+  if(v && v!==DEFAULT_CLIENT_ID) localStorage.setItem("pka_client_id", v);
+  else localStorage.removeItem("pka_client_id");   // ריק/ברירת מחדל → חזרה למובנה
+});
 
 /* ---------- מיפוי צבע אירוע (colorId) — מקור האמת לשיוך ---------- */
 /* אדום=א' · כתום=ב' · צהוב=ג' · ירוק=ד' · ורוד=לו"ז מקביל · אפור=פלס"ם.
