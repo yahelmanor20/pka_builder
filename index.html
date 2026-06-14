@@ -956,10 +956,69 @@ async function exportDocx(){
     return makeTable(out, widths);
   }
 
+  /* ---- לו"ז עקרוני: 3 הפעילויות העיקריות בכל יום ---- */
+  function buildPrincipleSchedule(){
+    // רעש מנהלתי/שגרתי שלא נחשב "פעילות עיקרית" (אלא אם אין אחר)
+    const NOISE=/ארוח|חד"?א|^א\.?[בצע]$|משיכ|מסדר|לינ|ערב חופשי|התארגנות|חלוק|ניקיון|פינוי|נסיע|הסע|חופש|מנוח|התכנס|סיכום יום|פתיחת יום/;
+    const mins=(e)=>{ if(!e.start||!e.end) return 45; const a=e.start.split(":"),b=e.end.split(":");
+      const d=(+b[0]*60+ +b[1])-(+a[0]*60+ +a[1]); return d>0?d:45; };
+    const base=(s)=> String(s||"").replace(/\s*\(.*$/,"").trim();   // מוריד פירוט בסוגריים
+    const out=[];
+    for(const day of parsedDays){
+      const evs=day.events.filter(e=>e.cleanSummary);
+      if(!evs.some(e=>e.track==="main")) continue;
+      const map=new Map();
+      for(const e of evs){
+        const nm=base(e.cleanSummary); if(!nm) continue;
+        const cur=map.get(nm)||{name:nm, m:0, noise:true, loc:"", note:"", time:e.timeRange};
+        cur.m+=mins(e);
+        cur.noise=cur.noise && NOISE.test(nm);
+        if(!cur.loc && e.location && e.location!==UNKNOWN_LOC) cur.loc=e.location;
+        if(!cur.note && e.notes) cur.note=e.notes;
+        map.set(nm,cur);
+      }
+      let cand=[...map.values()];
+      let pick=cand.filter(c=>!c.noise);
+      if(pick.length<3) pick=pick.concat(cand.filter(c=>c.noise));   // השלמה משגרה רק אם חסר
+      pick.sort((a,b)=> b.m-a.m);
+      const items=pick.slice(0,3).map(c=>({ name:c.name, sub:(c.note||c.loc||c.time||"") }));
+      while(items.length<3) items.push({name:"—",sub:""});
+      out.push({label:day.label, items});
+    }
+    return out;
+  }
+  function principleTableDocx(rows){
+    const dayW=1700, colW=Math.floor((FULLW-dayW)/3), widths=[dayW,colW,colW,colW];
+    const trs=[
+      tableRow([ cell('לו"ז עקרוני — עיקרי השבוע',{bold:true,shade:DARK,span:4}) ]),
+      tableRow([ cell("יום",{bold:true,shade:HEAD}),
+        cell("שלוש הפעילויות העיקריות של היום",{bold:true,shade:HEAD,span:3}) ]) ];
+    for(const r of rows){
+      const c=[ cell(r.label,{bold:true,shade:"F2F2F2"}) ];
+      for(const it of r.items){
+        if(it.name==="—"){ c.push(cell("—")); continue; }
+        const lines=[{text:it.name,bold:true}];
+        if(it.sub) lines.push({text:it.sub,bold:false});
+        c.push(cell(lines,{align:"right"}));
+      }
+      trs.push(tableRow(c));
+    }
+    return makeTable(trs, widths);
+  }
+
   /* ====== הרכבת המסמך — לו"ז + דרישות ====== */
   const battalion = $("battalion").value.trim() || "";
   const children=[];
   let first=true;
+  const principle=buildPrincipleSchedule();
+  if(principle.length){
+    children.push(new D.Paragraph({bidirectional:true, alignment:D.AlignmentType.RIGHT, spacing:{after:60},
+      children:[rtl('לו"ז עקרוני',{bold:true,size:26,underline:{}})]}));
+    children.push(new D.Paragraph({bidirectional:true, alignment:D.AlignmentType.RIGHT, spacing:{after:120},
+      children:[rtl('שלוש הפעילויות העיקריות בכל יום — סקירת השבוע.',{size:18})]}));
+    children.push(principleTableDocx(principle));
+    first=false;   // הלו"ז היומי הראשון יתחיל בעמוד חדש
+  }
   for(const day of parsedDays){
     if(!day.events.some(e=>e.track==="main")) continue;
     if(!first) children.push(new D.Paragraph({pageBreakBefore:true, children:[]}));
