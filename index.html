@@ -50,7 +50,15 @@ window.addEventListener("load", function(){
   }
   .card h2{margin:0 0 14px;font-size:16px;color:#15202d;border-right:4px solid var(--accent);padding-right:10px;}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-  @media(max-width:640px){.grid{grid-template-columns:1fr;}}
+  @media(max-width:640px){
+    .grid{grid-template-columns:1fr;}
+    .wrap{padding:12px;}
+    /* טבלאות הלו"ז רחבות מהמסך — נותנים להן רוחב לפי התוכן (לא נמחצות)
+       והעטיפה .tablescroll מאפשרת גלילה/מגע אופקי במקום חיתוך */
+    .tablescroll table.luz,.tablescroll table.appx,.tablescroll table.req{min-width:max-content;}
+    table{font-size:12px;}
+    th,td{padding:5px 6px;}
+  }
   label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px;font-weight:600;}
   input,select,textarea{
     width:100%;background:var(--field);color:var(--txt);
@@ -79,6 +87,9 @@ window.addEventListener("load", function(){
     background:rgba(31,127,196,.08);border:1px solid rgba(31,127,196,.30);color:#2a4a63;}
   [data-theme="dark"] .notice{background:rgba(58,155,220,.10);border-color:rgba(58,155,220,.35);color:#cfe0ee;}
   .daybox{border:1px solid var(--line);border-radius:10px;margin:10px 0;overflow:hidden;}
+  /* גלילה אופקית לטבלאות התצוגה המקדימה — חיוני במובייל כדי שהלו"ז לא ייחתך */
+  .tablescroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;}
+  .tablescroll table{margin:0;}
   .dayhead{background:var(--panel2);padding:9px 13px;font-weight:700;font-size:14px;color:#15202d;}
   table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;}
   th,td{border:1px solid var(--line);padding:7px 9px;text-align:right;vertical-align:top;}
@@ -713,7 +724,7 @@ function renderPreview(){
   for(const day of parsedDays){
     if(!day.events.some(e=>e.track==="main")) continue;
     const box=document.createElement("div"); box.className="daybox";
-    box.appendChild(renderLuzTable(day));
+    box.appendChild(scrollWrap(renderLuzTable(day)));
     host.appendChild(box);
   }
 
@@ -726,9 +737,11 @@ function renderPreview(){
     const head=document.createElement("div"); head.className="dayhead";
     head.textContent = title+" (לפי צבע "+colorWord+" ביומן)";
     box.appendChild(head);
-    box.appendChild(renderAppendixTable(track,m));
+    box.appendChild(scrollWrap(renderAppendixTable(track,m)));
     host.appendChild(box);
   }
+  /* עוטף טבלה ב-div גליל אופקי כדי שלא תיחתך במסכים צרים */
+  function scrollWrap(el){ const w=document.createElement("div"); w.className="tablescroll"; w.appendChild(el); return w; }
 
   /* ---- דרישות אימון (נגזר מהלו"ז) ---- */
   const req = deriveRequirements();
@@ -737,8 +750,8 @@ function renderPreview(){
     const head=document.createElement("div"); head.className="dayhead";
     head.textContent = 'דרישות אימון (נגזר אוטומטית מהלו"ז — לאימות המפ"ץ)';
     box.appendChild(head);
-    if(req.top.length)    box.appendChild(renderReqTable("גורמי מטה / גדוד", req.top, req.dayLabels, "reqtop"));
-    if(req.bottom.length) box.appendChild(renderReqTable('פק"א של הבא"פ (משאבי בא"פ)', req.bottom, req.dayLabels, "reqbot"));
+    if(req.top.length)    box.appendChild(scrollWrap(renderReqTable("גורמי מטה / גדוד", req.top, req.dayLabels, "reqtop")));
+    if(req.bottom.length) box.appendChild(scrollWrap(renderReqTable('פק"א של הבא"פ (משאבי בא"פ)', req.bottom, req.dayLabels, "reqbot")));
     if(req.review && req.review.length){
       const rb=document.createElement("div"); rb.className="reviewbar";
       rb.innerHTML='⚠ פריטים שלא זוהו אוטומטית — בדיקה ידנית:<br>'+req.review.map(esc).join("<br>");
