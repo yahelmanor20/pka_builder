@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
 <title>מחולל פק"א מגוגל קלנדר</title>
 
 <!-- Google Identity Services (OAuth) -->
@@ -88,7 +88,7 @@ window.addEventListener("load", function(){
   [data-theme="dark"] .notice{background:rgba(58,155,220,.10);border-color:rgba(58,155,220,.35);color:#cfe0ee;}
   .daybox{border:1px solid var(--line);border-radius:10px;margin:10px 0;overflow:hidden;}
   /* גלילה אופקית לטבלאות התצוגה המקדימה — חיוני במובייל כדי שהלו"ז לא ייחתך */
-  .tablescroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;}
+  .tablescroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;touch-action:pan-x pan-y pinch-zoom;}
   .tablescroll table{margin:0;}
   .dayhead{background:var(--panel2);padding:9px 13px;font-weight:700;font-size:14px;color:#15202d;}
   table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;}
