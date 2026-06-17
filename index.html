@@ -64,9 +64,6 @@
   @media(max-width:640px){
     .grid{grid-template-columns:1fr;}
     .wrap{padding:12px;}
-    /* טבלאות הלו"ז רחבות מהמסך — נותנים להן רוחב לפי התוכן (לא נמחצות)
-       והעטיפה .tablescroll מאפשרת גלילה/מגע אופקי במקום חיתוך */
-    .tablescroll table.luz,.tablescroll table.appx,.tablescroll table.req{min-width:max-content;}
     table{font-size:12px;}
     th,td{padding:5px 6px;}
   }
@@ -98,9 +95,19 @@
     background:rgba(31,127,196,.08);border:1px solid rgba(31,127,196,.30);color:#2a4a63;}
   [data-theme="dark"] .notice{background:rgba(58,155,220,.10);border-color:rgba(58,155,220,.35);color:#cfe0ee;}
   .daybox{border:1px solid var(--line);border-radius:10px;margin:10px 0;overflow:hidden;}
-  /* גלילה אופקית לטבלאות התצוגה המקדימה — חיוני במובייל כדי שהלו"ז לא ייחתך */
-  .tablescroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;touch-action:pan-x pan-y pinch-zoom;}
-  .tablescroll table{margin:0;}
+  /* ===== זום/הזזה לטבלאות התצוגה המקדימה (צביטה + כפתורים) ===== */
+  .zoomwrap{position:relative;max-width:100%;direction:ltr;}
+  .zoomclip{overflow:hidden;width:100%;max-width:100%;position:relative;background:var(--panel);
+    touch-action:none;}                 /* תופס את מחוות הצביטה/גרירה רק בתוך הטבלה */
+  .zoomstage{position:absolute;top:0;left:0;transform-origin:0 0;width:max-content;will-change:transform;}
+  .zoomstage table{direction:rtl;margin:0;}
+  .zoomtoolbar{display:flex;gap:6px;justify-content:flex-end;padding:6px 4px;direction:ltr;}
+  .zoomtoolbar button{padding:4px 11px;font-size:15px;line-height:1;font-weight:700;min-width:34px;
+    background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;
+    box-shadow:none;cursor:pointer;font-family:inherit;}
+  .zoomtoolbar button:hover{filter:brightness(1.07);}
+  .zoomhint{font-size:11.5px;color:var(--muted);text-align:right;direction:rtl;padding:4px 4px 0;}
+  @media(hover:hover){ .zoomhint{display:none;} }   /* הרמז רק במכשירי מגע */
   .dayhead{background:var(--panel2);padding:9px 13px;font-weight:700;font-size:14px;color:#15202d;}
   /* בלוק "דגשים ליום" — מתחת לטבלת הלו"ז */
   .dayhl{background:var(--panel2);padding:8px 13px;border-top:1px solid var(--line);}
@@ -339,6 +346,105 @@
 
 /* ---------- כלי עזר ---------- */
 const $ = id => document.getElementById(id);
+/* ---------- זום/הזזה לטבלאות התצוגה המקדימה ---------- */
+const ZOOM_MIN = 0.2, ZOOM_MAX = 6;
+const zoomInstances = new Set();   // {fit} לכל עטיפת זום פעילה
+let _zoomResizeBound = false;
+function bindZoomResize(){
+  if(_zoomResizeBound) return; _zoomResizeBound = true;
+  let raf = 0;
+  const on = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(()=> zoomInstances.forEach(i=>i.fit())); };
+  window.addEventListener("resize", on);
+  window.addEventListener("orientationchange", on);
+}
+/* עוטף טבלה בשכבת זום+הזזה (Pointer Events + transform). תצוגה מקדימה בלבד. */
+function zoomWrap(el){
+  bindZoomResize();
+  const wrap  = document.createElement("div"); wrap.className = "zoomwrap";
+  const clip  = document.createElement("div"); clip.className = "zoomclip";
+  const stage = document.createElement("div"); stage.className = "zoomstage";
+  stage.appendChild(el); clip.appendChild(stage);
+  const bar = document.createElement("div"); bar.className = "zoomtoolbar";
+  const mkBtn = (txt,title)=>{ const b=document.createElement("button"); b.type="button";
+    b.textContent=txt; b.title=title; b.setAttribute("aria-label",title); return b; };
+  const bFit=mkBtn("⤢","התאם לרוחב"), bMinus=mkBtn("−","הקטן"), bPlus=mkBtn("＋","הגדל");
+  bar.append(bFit, bMinus, bPlus);
+  const hint=document.createElement("div"); hint.className="zoomhint"; hint.textContent="צביטה לזום · גרירה להזזה · דאבל-טאפ";
+  wrap.append(bar, clip, hint);
+
+  let s=1, tx=0, ty=0, natW=0, natH=0;
+  const pointers=new Map();
+  let pinchD0=0, pinchS0=1, anchor={x:0,y:0};
+  let panX0=0, panY0=0, tx0=0, ty0=0;
+
+  function measure(){ natW=el.scrollWidth||el.offsetWidth||1; natH=el.scrollHeight||el.offsetHeight||1; }
+  function clamp(){
+    s=Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,s));
+    const wrapW=clip.clientWidth||1, sw=natW*s;
+    if(sw<=wrapW){ tx=(wrapW-sw)/2; } else { tx=Math.max(wrapW-sw,Math.min(0,tx)); }
+    ty=Math.min(0,ty);   /* הגובה עוקב אחרי התוכן → אין פאן אנכי */
+  }
+  function applyTransform(){
+    clamp();
+    stage.style.transform=`translate(${tx}px,${ty}px) scale(${s})`;
+    clip.style.height=(natH*s)+"px";
+  }
+  function fit(){
+    if(!clip.isConnected){ zoomInstances.delete(api); return; }
+    const wrapW=clip.clientWidth;
+    if(!wrapW){ requestAnimationFrame(fit); return; }
+    measure(); s=Math.min(1,wrapW/natW); tx=(wrapW-natW*s)/2; ty=0; applyTransform();
+  }
+  const local=(cx,cy)=>{ const r=clip.getBoundingClientRect(); return {x:cx-r.left,y:cy-r.top}; };
+  function twoPts(){ const a=[...pointers.values()]; if(a.length<2) return null;
+    const p1=local(a[0].x,a[0].y), p2=local(a[1].x,a[1].y);
+    return { mid:{x:(p1.x+p2.x)/2,y:(p1.y+p2.y)/2}, dist:Math.hypot(p2.x-p1.x,p2.y-p1.y)||1 }; }
+
+  function onDown(e){
+    pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    try{ stage.setPointerCapture(e.pointerId); }catch(_){}
+    e.preventDefault();
+    if(pointers.size===1){ const p=local(e.clientX,e.clientY); panX0=p.x; panY0=p.y; tx0=tx; ty0=ty; }
+    else if(pointers.size===2){ const st=twoPts(); pinchD0=st.dist; pinchS0=s; anchor=st.mid; }
+  }
+  function onMove(e){
+    if(!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId,{x:e.clientX,y:e.clientY}); e.preventDefault();
+    if(pointers.size>=2){
+      const st=twoPts(); if(!st) return;
+      const newS=Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,pinchS0*(st.dist/pinchD0)));
+      const worldX=(anchor.x-tx)/s, worldY=(anchor.y-ty)/s;
+      s=newS; tx=st.mid.x-worldX*s; ty=st.mid.y-worldY*s; anchor=st.mid; applyTransform();
+    } else if(pointers.size===1){
+      const p=local(e.clientX,e.clientY); tx=tx0+(p.x-panX0); ty=ty0+(p.y-panY0); applyTransform();
+    }
+  }
+  function onUp(e){
+    pointers.delete(e.pointerId);
+    try{ stage.releasePointerCapture(e.pointerId); }catch(_){}
+    if(pointers.size===1){ const o=[...pointers.values()][0]; const p=local(o.x,o.y); panX0=p.x; panY0=p.y; tx0=tx; ty0=ty; }
+  }
+  stage.addEventListener("pointerdown",onDown,{passive:false});
+  stage.addEventListener("pointermove",onMove,{passive:false});
+  stage.addEventListener("pointerup",onUp);
+  stage.addEventListener("pointercancel",onUp);
+  stage.addEventListener("lostpointercapture",onUp);
+
+  function zoomBy(f){
+    const cx=(clip.clientWidth||1)/2, cy=(clip.clientHeight||1)/2;
+    const worldX=(cx-tx)/s, worldY=(cy-ty)/s;
+    s=Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,s*f));
+    tx=cx-worldX*s; ty=cy-worldY*s; applyTransform();
+  }
+  bPlus.addEventListener("click",()=>zoomBy(1.25));
+  bMinus.addEventListener("click",()=>zoomBy(1/1.25));
+  bFit.addEventListener("click",fit);
+  stage.addEventListener("dblclick",e=>{ e.preventDefault(); if(s>1.05) fit(); else zoomBy(2); });
+
+  const api={fit}; zoomInstances.add(api);
+  requestAnimationFrame(fit);
+  return wrap;
+}
 const HE_DAYS = ["יום א'","יום ב'","יום ג'","יום ד'","יום ה'","יום ו'","שבת"];
 const HE_DAYS_FULL = ["יום ראשון","יום שני","יום שלישי","יום רביעי","יום חמישי","יום שישי","שבת"];
 const UNKNOWN_LOC = "מיקום לא ידוע";
@@ -797,6 +903,7 @@ function renderPreview(){
   const host = $("preview");
   if(!parsedDays.some(d=>d.events.some(e=>e.track==="main"))){ host.innerHTML='<span class="hint">לא נמצאו אירועי לו"ז בטווח שנבחר.</span>'; return; }
   host.innerHTML="";
+  zoomInstances.clear();   // עטיפות זום מהרינדור הקודם הוסרו מה-DOM
 
   /* מונה אי-ודאות (לו"ז ראשי בלבד) */
   let flagged=0; parsedDays.forEach(d=>d.events.forEach(e=>{ if(e.track==="main" && e.issues.length) flagged++; }));
@@ -834,7 +941,7 @@ function renderPreview(){
     host.appendChild(box);
   }
   /* עוטף טבלה ב-div גליל אופקי כדי שלא תיחתך במסכים צרים */
-  function scrollWrap(el){ const w=document.createElement("div"); w.className="tablescroll"; w.appendChild(el); return w; }
+  function scrollWrap(el){ return zoomWrap(el); }
 
   /* ---- דרישות אימון (נגזר מהלו"ז) ---- */
   const req = deriveRequirements();
