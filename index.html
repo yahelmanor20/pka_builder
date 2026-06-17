@@ -182,6 +182,10 @@ window.addEventListener("load", function(){
   .pdf-root table.luz tr.parrow td{background:#f8cbdc !important;color:#000 !important;font-weight:700;}
   .pdf-root table.luz tr.warn td{background:#fff2cc !important;}
   .pdf-root table.luz .loc{display:block;font-weight:700;color:#262626;margin-top:2px;}
+  .pdf-root .dayhl{background:#f7f7f7 !important;padding:8px 12px;border:1px solid #bfbfbf;border-top:none;margin:0 0 6px;}
+  .pdf-root .dayhl-h{font-weight:700;font-size:13px;color:#8c3a3a !important;margin-bottom:4px;}
+  .pdf-root .dayhl ul{margin:0 16px 0 0;padding:0;list-style:disc;}
+  .pdf-root .dayhl li{font-size:12px;color:#262626 !important;margin:2px 0;}
   .pdf-root table.appx tr.hdr th{background:#595959 !important;color:#fff !important;}
   .pdf-root table.appx td.name{background:#595959 !important;color:#fff !important;font-weight:700;}
   .pdf-root table.appx.parallel tr.hdr th,.pdf-root table.appx.parallel td.name{background:#f8cbdc !important;color:#000 !important;}
@@ -935,7 +939,7 @@ function buildPdfPages(){
   const battalion = $("battalion").value.trim() || "";
   const pages=[];
 
-  let firstDay=true;
+  let firstDay=true, dayN=0;
   for(const day of parsedDays){
     if(!day.events.some(e=>e.track==="main")) continue;
     const pg=document.createElement("div"); pg.className="pdf-page";
@@ -949,7 +953,15 @@ function buildPdfPages(){
       firstDay=false;
     }
     pg.appendChild(renderLuzTable(day));
+    const hl=buildDayHighlights(day);
+    if(hl.length){
+      const hb=document.createElement("div"); hb.className="dayhl";
+      hb.innerHTML=`<div class="dayhl-h">דגשים ליום ${esc(HL_LETTERS[dayN]||"")}</div><ul>`+
+        hl.map(t=>`<li>${esc(t)}</li>`).join("")+`</ul>`;
+      pg.appendChild(hb);
+    }
     pages.push(pg);
+    dayN++;
   }
 
   /* נספחי לו"ז מקביל / פלס"ם — כל אחד בעמוד משלו */
