@@ -18,6 +18,17 @@ window.addEventListener("load", function(){
   }
 });
 </script>
+<!-- html2pdf (ייצוא PDF נאמן-לתצוגה, עוטף html2canvas + jsPDF, חושף global `html2pdf`) -->
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js"></script>
+<script>
+window.addEventListener("load", function(){
+  if(typeof html2pdf === "undefined"){       // CDN ראשי נפל — נסה מקור חלופי
+    var s=document.createElement("script");
+    s.src="https://unpkg.com/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js";
+    document.head.appendChild(s);
+  }
+});
+</script>
 
 <!-- ערכת נושא מוקדמת (מונע הבהוב) -->
 <script>try{document.documentElement.setAttribute("data-theme",localStorage.getItem("pka_theme")||"light");}catch(e){}</script>
@@ -137,6 +148,37 @@ window.addEventListener("load", function(){
   .legend{font-size:12px;color:var(--muted);margin:6px 0 0;}
   .legend .sw{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-inline-start:4px;}
 
+  /* ===== ייצוא PDF — קונטיינר מוסתר, נאמן לתצוגה וחסין מצב-כהה (כל הצבעים מפורשים) ===== */
+  .pdf-root{position:fixed;left:-10000px;top:0;width:780px;background:#fff;color:#262626;
+    direction:rtl;font-family:"David","Segoe UI",Arial,sans-serif;padding:0;}
+  .pdf-root *{box-shadow:none !important;}
+  .pdf-title{background:#333333;color:#fff;text-align:center;font-weight:700;font-size:20px;padding:14px 10px;}
+  .pdf-sub{text-align:center;color:#595959;font-size:13px;padding:6px 10px 14px;}
+  .pdf-day{page-break-inside:avoid;margin:0 0 14px;}
+  .pdf-break{page-break-before:always;}
+  .pdf-secttl{font-weight:700;color:#333333;font-size:16px;text-align:center;margin:10px 0 8px;}
+  .pdf-root table{width:100%;border-collapse:collapse;font-size:12px;background:#fff !important;margin:0 0 6px;}
+  .pdf-root tr{page-break-inside:avoid;}
+  .pdf-root th,.pdf-root td{border:1px solid #bfbfbf !important;padding:6px 8px;
+    background:#fff !important;color:#262626 !important;text-align:right;vertical-align:top;}
+  .pdf-root table.luz td,.pdf-root table.luz th{text-align:center;vertical-align:middle;}
+  .pdf-root table.luz tr.daytitle td{background:#333333 !important;color:#fff !important;font-weight:700;font-size:14px;}
+  .pdf-root table.luz tr.hdr th{background:#595959 !important;color:#fff !important;font-weight:700;}
+  .pdf-root table.luz tr.batrow td{background:#fff !important;color:#262626 !important;font-weight:700;}
+  .pdf-root table.luz tr.parrow td{background:#f8cbdc !important;color:#000 !important;font-weight:700;}
+  .pdf-root table.luz tr.warn td{background:#fff2cc !important;}
+  .pdf-root table.luz .loc{display:block;font-weight:700;color:#262626;margin-top:2px;}
+  .pdf-root table.appx tr.hdr th{background:#595959 !important;color:#fff !important;}
+  .pdf-root table.appx td.name{background:#595959 !important;color:#fff !important;font-weight:700;}
+  .pdf-root table.appx.parallel tr.hdr th,.pdf-root table.appx.parallel td.name{background:#f8cbdc !important;color:#000 !important;}
+  .pdf-root table.appx.palsam tr.hdr th,.pdf-root table.appx.palsam td.name{background:#d9d9d9 !important;color:#000 !important;}
+  .pdf-root table.req tr.blocktitle td{color:#13202d !important;font-weight:700;text-align:center;font-size:14px;}
+  .pdf-root table.req.reqtop tr.blocktitle td{background:#9dc3e6 !important;}
+  .pdf-root table.req.reqbot tr.blocktitle td{background:#a9d08e !important;}
+  .pdf-root table.req tr.hdr th{background:#595959 !important;color:#fff !important;}
+  .pdf-root table.req td.name{background:#e7e6e6 !important;color:#262626 !important;font-weight:700;}
+  .pdf-root .badge{display:inline-block;font-size:10px;color:#8c3a3a;border:1px solid #d3a;border-radius:8px;padding:0 6px;margin-inline-start:4px;}
+
   /* ===== מצב כהה (Dark mode) ===== */
   [data-theme="dark"]{
     --bg:#0f1620; --panel:#172230; --panel2:#1f2d3d; --line:#2c3e50;
@@ -232,16 +274,17 @@ window.addEventListener("load", function(){
 
   <!-- ===== ייצוא ===== -->
   <div class="card">
-    <h2>4 · ייצוא לו"ז (Word)</h2>
+    <h2>4 · ייצוא לו"ז (Word / PDF)</h2>
     <label style="display:flex;align-items:center;gap:6px;font-weight:normal;margin-bottom:8px">
       <input type="checkbox" id="inlineParallel" />
       שלב את הלו"ז המקביל גם בלו"ז היומי (הנספח יישאר תמיד)
     </label>
     <div class="row">
       <button id="exportBtn">צור והורד פק"א (Word)</button>
+      <button id="exportPdfBtn" class="sec">צור והורד פק"א (PDF)</button>
       <span id="exportState" class="statusbar"></span>
     </div>
-    <div class="hint">הקובץ כולל את הלו"ז היומי, לו"ז מקביל, לו"ז פלס"ם (בפורמט התבנית), ובסוף — נספח דרישות אימון נגזר אוטומטית (לרוחב). שאר הסעיפים המילוליים ממולאים ידנית.</div>
+    <div class="hint">שתי האפשרויות כוללות את הלו"ז היומי, לו"ז מקביל, לו"ז פלס"ם ונספח דרישות אימון נגזר. ה-Word לעריכה והמשך מילוי הסעיפים; ה-PDF מעוצב לצפייה והורדה נוחה בנייד (עמוד לכל יום).</div>
   </div>
 
   <!-- ===== עזרה ===== -->
@@ -838,7 +881,89 @@ function esc(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":
 /* ===============  יצירת מסמך Word (docx)  ============== */
 /* ====================================================== */
 $("exportBtn").addEventListener("click", exportDocx);
+$("exportPdfBtn").addEventListener("click", exportPdf);
 $("inlineParallel").addEventListener("change", ()=>{ if(parsedDays.length) renderPreview(); });
+
+/* ====================================================== */
+/* ===============  ייצוא PDF (נאמן לתצוגה)  ============= */
+/* ====================================================== */
+/* בונה קונטיינר מוסתר (.pdf-root) ע"י אותן פונקציות רינדור של התצוגה
+   המקדימה, וממיר אותו ל-PDF עם html2pdf. עמוד לכל יום + נספחים בעמודים נפרדים. */
+function buildPdfRoot(){
+  const battalion = $("battalion").value.trim() || "";
+  const root=document.createElement("div"); root.className="pdf-root";
+
+  const title=document.createElement("div"); title.className="pdf-title";
+  title.textContent='פק"א — לו"ז אימון' + (battalion?(' · גדוד '+battalion):'');
+  root.appendChild(title);
+  if(parsedDays.length){
+    const sub=document.createElement("div"); sub.className="pdf-sub";
+    sub.textContent='שבוע אימון · '+parsedDays[0].label+' – '+parsedDays[parsedDays.length-1].label;
+    root.appendChild(sub);
+  }
+
+  /* עמוד לכל יום */
+  let firstDay=true;
+  for(const day of parsedDays){
+    if(!day.events.some(e=>e.track==="main")) continue;
+    const d=document.createElement("div"); d.className="pdf-day"+(firstDay?"":" pdf-break");
+    firstDay=false;
+    d.appendChild(renderLuzTable(day));
+    root.appendChild(d);
+  }
+
+  /* נספחי לו"ז מקביל / פלס"ם — כל אחד בעמוד חדש */
+  pdfAppendix("parallel",'נספח – לו"ז מקביל');
+  pdfAppendix("palsam",  'נספח – לו"ז פלס"ם');
+  function pdfAppendix(track,title){
+    const m=buildAppendixMatrix(track); if(!m) return;
+    const sec=document.createElement("div"); sec.className="pdf-break";
+    const h=document.createElement("div"); h.className="pdf-secttl"; h.textContent=title;
+    sec.appendChild(h); sec.appendChild(renderAppendixTable(track,m));
+    root.appendChild(sec);
+  }
+
+  /* נספח דרישות אימון */
+  const req=deriveRequirements();
+  if(req && (req.top.length || req.bottom.length)){
+    const sec=document.createElement("div"); sec.className="pdf-break";
+    const h=document.createElement("div"); h.className="pdf-secttl"; h.textContent='נספח – דרישות אימון';
+    sec.appendChild(h);
+    if(req.top.length)    sec.appendChild(renderReqTable("גורמי מטה / גדוד", req.top, req.dayLabels, "reqtop"));
+    if(req.bottom.length) sec.appendChild(renderReqTable('פק"א של הבא"פ (משאבי בא"פ)', req.bottom, req.dayLabels, "reqbot"));
+    if(req.review && req.review.length){
+      const rv=document.createElement("div");
+      rv.style.cssText="color:#8c3a3a;font-size:12px;margin-top:6px;font-family:'David',serif;";
+      rv.innerHTML='⚠ פריטים שלא זוהו אוטומטית — בדיקה ידנית:<br>'+req.review.map(esc).join("<br>");
+      sec.appendChild(rv);
+    }
+    root.appendChild(sec);
+  }
+  return root;
+}
+
+async function exportPdf(){
+  if(typeof html2pdf==="undefined"){ alert("ספריית יצירת ה-PDF עדיין נטענת, נסה שוב."); return; }
+  if(!parsedDays.some(d=>d.events.some(e=>e.track==="main"))){ $("exportState").textContent="אין אירועי לו\"ז לייצוא — משוך אירועים תחילה."; return; }
+  const btn=$("exportPdfBtn"); btn.disabled=true;
+  $("exportState").textContent="בונה PDF…";
+  const battalion = $("battalion").value.trim() || "";
+  const root=buildPdfRoot();
+  document.body.appendChild(root);
+  const opt={
+    margin:[8,6,10,6],
+    filename:'פקא לאימון גדוד '+(battalion||"")+'.pdf',
+    image:{type:'jpeg',quality:0.96},
+    html2canvas:{scale:2,backgroundColor:'#ffffff',useCORS:true,windowWidth:820},
+    jsPDF:{unit:'mm',format:'a4',orientation:'portrait',compress:true},
+    pagebreak:{mode:['css','legacy'],before:'.pdf-break',avoid:'tr'}
+  };
+  try{
+    await html2pdf().set(opt).from(root).save();
+    $("exportState").textContent='ה-PDF הופק והורד ✓';
+  }catch(e){ $("exportState").textContent="שגיאה ביצירת ה-PDF: "+e.message; }
+  finally{ root.remove(); btn.disabled=false; }
+}
 
 async function exportDocx(){
   if(typeof docx==="undefined"){ alert("ספריית יצירת ה-Word עדיין נטענת, נסה שוב."); return; }
