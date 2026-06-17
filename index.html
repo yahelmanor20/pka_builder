@@ -7,34 +7,27 @@
 
 <!-- Google Identity Services (OAuth) -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<!-- docx.js (Word generation, exposes global `docx`) — חובה נתיב UMD, build/index.js לא קיים (404) -->
+<!-- ספריות מסמכים. סדר טעינה חשוב: docx-preview דורס global `docx`, לכן שומרים ומשחזרים. -->
+<!-- 1) docx.js — יצירת Word (UMD, global `docx`) -->
 <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.min.js"></script>
-<script>
-window.addEventListener("load", function(){
-  if(typeof docx === "undefined"){          // CDN ראשי נפל — נסה מקור חלופי
-    var s=document.createElement("script");
-    s.src="https://unpkg.com/docx@8.5.0/build/index.umd.js";
-    document.head.appendChild(s);
-  }
-});
-</script>
-<!-- ייצוא PDF נאמן-לתצוגה: html2canvas (חושף global `html2canvas`) + jsPDF (חושף `window.jspdf.jsPDF`).
-     רינדור עמוד-אחר-עמוד כדי להימנע ממגבלת גודל-קנבס בנייד (שגרמה ל-PDF ריק). -->
+<script>window.DocxGen = window.docx;</script>
+<!-- 2) html2canvas + jsPDF — רסטור DOM→PDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- 3) JSZip + docx-preview — רינדור ה-docx ל-DOM (PDF "נאמן ל-Word") -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.7/dist/docx-preview.min.js"></script>
 <script>
-window.addEventListener("load", function(){
-  if(typeof html2canvas === "undefined"){     // CDN ראשי נפל — מקור חלופי
-    var s=document.createElement("script");
-    s.src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";
-    document.head.appendChild(s);
-  }
-  if(typeof window.jspdf === "undefined"){
-    var j=document.createElement("script");
-    j.src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js";
-    document.head.appendChild(j);
-  }
-});
+  window.DocxPreview = window.docx;                 // namespace של docx-preview (renderAsync)
+  if(window.DocxGen) window.docx = window.DocxGen;   // שחזור ספריית היצירה ל-global `docx`
+  /* גיבוי CDN — נטען רק אם משהו נכשל */
+  window.addEventListener("load", function(){
+    function need(cond, src, cb){ if(cond){ var s=document.createElement("script"); s.src=src; if(cb)s.onload=cb; document.head.appendChild(s); } }
+    need(!window.DocxGen || !window.DocxGen.Packer, "https://unpkg.com/docx@8.5.0/build/index.umd.js", function(){ window.DocxGen=window.docx; });
+    need(typeof html2canvas==="undefined", "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js");
+    need(typeof window.jspdf==="undefined", "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js");
+    need(!window.DocxPreview || !window.DocxPreview.renderAsync, "https://unpkg.com/docx-preview@0.3.7/dist/docx-preview.min.js", function(){ window.DocxPreview=window.docx; if(window.DocxGen)window.docx=window.DocxGen; });
+  });
 </script>
 
 <!-- ערכת נושא מוקדמת (מונע הבהוב) -->
@@ -312,7 +305,7 @@ window.addEventListener("load", function(){
       </label>
       <span id="exportState" class="statusbar"></span>
     </div>
-    <div class="hint">שתי האפשרויות כוללות את הלו"ז היומי, לו"ז מקביל, לו"ז פלס"ם ונספח דרישות אימון נגזר. ה-Word לעריכה והמשך מילוי הסעיפים; ה-PDF מעוצב לצפייה והורדה נוחה בנייד (עמוד לכל יום).<br><b>סגנון PDF:</b> "נאמן לתצוגה" — בדיוק כמו התצוגה המקדימה. "נאמן ל-Word" — פותח בלו"ז עקרוני, מסגרות שחורות, ונספח דרישות לרוחב, כמו מסמך ה-Word.</div>
+    <div class="hint">ה-Word לעריכה והמשך מילוי הסעיפים; ה-PDF להורדה וצפייה נוחה בנייד.<br><b>סגנון PDF:</b> "נאמן לתצוגה" — בדיוק כמו התצוגה המקדימה (עמוד לכל יום). "נאמן ל-Word" — <b>המרה מלאה של מסמך ה-Word ל-PDF</b>, אותם נתונים בדיוק: לו"ז עקרוני, לו"ז יומי + דגשים, לו"ז מקביל ופלס"ם, ונספח דרישות לרוחב.</div>
   </div>
 
   <!-- ===== עזרה ===== -->
@@ -1067,47 +1060,119 @@ function buildPdfPages(style){
   return pages;
 }
 
+/* מוסיף קנבס כעמוד ל-jsPDF (התאמה ל-A4 לפי אוריינטציה) */
+function addCanvasPage(JS, pdfRef, canvas, orient){
+  const pw=orient==="landscape"?297:210, ph=orient==="landscape"?210:297, M=6;
+  const img=canvas.toDataURL("image/jpeg",0.95);
+  if(!pdfRef.pdf) pdfRef.pdf=new JS({unit:"mm",format:"a4",orientation:orient,compress:true});
+  else            pdfRef.pdf.addPage("a4",orient);
+  const availW=pw-M*2, availH=ph-M*2;
+  let drawW=availW, drawH=canvas.height*availW/canvas.width;
+  if(drawH>availH){ drawH=availH; drawW=canvas.width*availH/canvas.height; }
+  pdfRef.pdf.addImage(img,"JPEG",(pw-drawW)/2,M,drawW,drawH);
+}
+
 async function exportPdf(){
+  const style=(($("pdfStyle")||{}).value)||"html";
+  return style==="word" ? exportPdfWord() : exportPdfHtml();
+}
+
+/* ===== PDF נאמן-לתצוגה: מרנדר את טבלאות התצוגה המקדימה, עמוד-אחר-עמוד ===== */
+async function exportPdfHtml(){
   const H = window.html2canvas;
   const JS = window.jspdf && window.jspdf.jsPDF;
   if(!H || !JS){ alert("ספריות ה-PDF עדיין נטענות, נסה שוב בעוד רגע."); return; }
   if(!parsedDays.some(d=>d.events.some(e=>e.track==="main"))){ $("exportState").textContent="אין אירועי לו\"ז לייצוא — משוך אירועים תחילה."; return; }
-  const style=(($("pdfStyle")||{}).value)||"html", word=style==="word";
   const btn=$("exportPdfBtn"); btn.disabled=true;
   $("exportState").textContent="בונה PDF…";
   const battalion = $("battalion").value.trim() || "";
-
-  const pages=buildPdfPages(style);
-  const holder=document.createElement("div"); holder.className="pdf-root"+(word?" pdf-word":"");
+  const pages=buildPdfPages("html");
+  const holder=document.createElement("div"); holder.className="pdf-root";
   document.body.appendChild(holder);
-
   try{
-    let pdf=null;
-    for(let i=0;i<pages.length;i++){
-      const orient=pages[i].orient||"portrait";
-      holder.style.width=(orient==="landscape"?1100:780)+"px";
-      holder.innerHTML=""; holder.appendChild(pages[i].el);
+    const ref={pdf:null};
+    for(const pg of pages){
+      holder.style.width="780px";
+      holder.innerHTML=""; holder.appendChild(pg.el);
       const canvas=await H(holder,{scale:2,backgroundColor:"#ffffff",useCORS:true,
         width:holder.offsetWidth, windowWidth:holder.offsetWidth});
-      const img=canvas.toDataURL("image/jpeg",0.95);
-      const pw=orient==="landscape"?297:210, ph=orient==="landscape"?210:297;
-      if(!pdf) pdf=new JS({unit:"mm",format:"a4",orientation:orient,compress:true});
-      else     pdf.addPage("a4",orient);
-      const M=6, availW=pw-M*2, availH=ph-M*2;
-      let drawW=availW, drawH=canvas.height*availW/canvas.width;
-      if(drawH>availH){ drawH=availH; drawW=canvas.width*availH/canvas.height; }
-      const x=(pw-drawW)/2;
-      pdf.addImage(img,"JPEG",x,M,drawW,drawH);
+      addCanvasPage(JS, ref, canvas, "portrait");
     }
-    pdf.save('פקא לאימון גדוד '+(battalion||"")+(word?' - Word':'')+'.pdf');
+    ref.pdf.save('פקא לאימון גדוד '+(battalion||"")+'.pdf');
     $("exportState").textContent='ה-PDF הופק והורד ✓';
   }catch(e){ $("exportState").textContent="שגיאה ביצירת ה-PDF: "+e.message; }
   finally{ holder.remove(); btn.disabled=false; }
 }
 
-async function exportDocx(){
-  if(typeof docx==="undefined"){ alert("ספריית יצירת ה-Word עדיין נטענת, נסה שוב."); return; }
-  $("exportState").textContent="בונה מסמך…";
+/* ===== PDF נאמן-ל-Word: בונה את ה-docx ומרנדר אותו עם docx-preview ===== */
+/* פאגינציה: אורז את הבלוקים העליונים של כל סקשן ל-עמודי A4 (בלי לפצל טבלה) */
+function paginateDocx(host){
+  const pages=[];
+  for(const sec of host.querySelectorAll("section.docx")){
+    const cs=getComputedStyle(sec);
+    const padT=parseFloat(cs.paddingTop)||0, padB=parseFloat(cs.paddingBottom)||0;
+    const pageH=parseFloat(cs.minHeight)||sec.clientHeight;          // גובה עמוד A4 (px)
+    const usableH=Math.max(120, pageH - padT - padB);
+    const orient=(sec.offsetWidth > pageH) ? "landscape" : "portrait";
+    const article=sec.querySelector("article")||sec;                // התוכן יושב בתוך <article>
+    const mkPage=()=>{
+      const pageDiv=sec.cloneNode(false);                           // משכפל class + סגנון העמוד (רוחב/שוליים)
+      pageDiv.style.minHeight=pageH+"px"; pageDiv.style.background="#fff"; pageDiv.style.margin="0";
+      const art=article.cloneNode(false);
+      pageDiv.appendChild(art);
+      const rec={el:pageDiv,orient,art}; pages.push(rec);
+      return art;
+    };
+    let art=mkPage(), curH=0;
+    for(const k of [...article.children]){
+      const kh=k.getBoundingClientRect().height;
+      const isBreak = getComputedStyle(k).breakBefore==="page" || k.style.breakBefore==="page";
+      if(curH>0 && (isBreak || curH+kh>usableH)){ art=mkPage(); curH=0; }
+      art.appendChild(k.cloneNode(true));
+      curH+=kh;
+    }
+  }
+  return pages.filter(p=>p.art.children.length);
+}
+
+async function exportPdfWord(){
+  const H = window.html2canvas;
+  const JS = window.jspdf && window.jspdf.jsPDF;
+  const DP = window.DocxPreview;
+  if(typeof docx==="undefined"){ alert("ספריית ה-Word עדיין נטענת, נסה שוב."); return; }
+  if(!H || !JS || !DP){ alert("ספריות ה-PDF/Word עדיין נטענות, נסה שוב בעוד רגע."); return; }
+  if(!parsedDays.some(d=>d.events.some(e=>e.track==="main"))){ $("exportState").textContent="אין אירועי לו\"ז לייצוא — משוך אירועים תחילה."; return; }
+  const btn=$("exportPdfBtn"); btn.disabled=true;
+  $("exportState").textContent="בונה PDF מה-Word…";
+  const battalion = $("battalion").value.trim() || "";
+
+  const host=document.createElement("div");
+  host.style.cssText="position:absolute;left:0;top:0;z-index:-9999;background:#fff;";
+  document.body.appendChild(host);
+  const render=document.createElement("div");
+  render.style.cssText="position:absolute;left:0;top:0;z-index:-9999;background:#fff;";
+  document.body.appendChild(render);
+  try{
+    const blob=await buildDocxBlob();
+    await DP.renderAsync(blob, host, null,
+      {className:"docx", inWrapper:false, breakPages:true, ignoreLastRenderedPageBreak:true,
+       renderHeaders:false, renderFooters:false, experimental:true});
+    const pages=paginateDocx(host);
+    const ref={pdf:null};
+    for(const pg of pages){
+      render.innerHTML=""; render.appendChild(pg.el);
+      const canvas=await H(pg.el,{scale:2,backgroundColor:"#ffffff",useCORS:true,
+        width:pg.el.offsetWidth, windowWidth:pg.el.offsetWidth});
+      addCanvasPage(JS, ref, canvas, pg.orient);
+    }
+    if(!ref.pdf) throw new Error("לא נוצרו עמודים");
+    ref.pdf.save('פקא לאימון גדוד '+(battalion||"")+' - Word.pdf');
+    $("exportState").textContent='ה-PDF (נאמן ל-Word) הופק והורד ✓';
+  }catch(e){ $("exportState").textContent="שגיאה ביצירת ה-PDF: "+e.message; }
+  finally{ host.remove(); render.remove(); btn.disabled=false; }
+}
+
+function buildDocxDoc(){
   const D = docx;
   const FONT="Segoe UI";       // עיצוב template_v2
   const FULLW=9360;            // רוחב טבלה מלא (twips) — כמו התבנית (~9351)
@@ -1277,7 +1342,7 @@ async function exportDocx(){
   let dayIdx=0;
   for(const day of parsedDays){
     if(!day.events.some(e=>e.track==="main")) continue;
-    if(!first) children.push(new D.Paragraph({pageBreakBefore:true, children:[]}));
+    if(!first) children.push(new D.Paragraph({children:[new D.PageBreak()]}));
     first=false;
     children.push(luzTableDocx(day));
     /* בלוק "דגשים ליום" — מתחת לטבלה, באותו עמוד (keepNext מונע גלישה/יתום) */
@@ -1296,12 +1361,12 @@ async function exportDocx(){
 
   const par=appendixDocx("parallel");
   if(par){
-    children.push(new D.Paragraph({pageBreakBefore:true, bidirectional:true, alignment:D.AlignmentType.RIGHT, spacing:{after:80}, children:[rtl('נספח – לו"ז מקביל',{bold:true,size:24,underline:{},color:ACCENT})]}));
+    children.push(new D.Paragraph({bidirectional:true, alignment:D.AlignmentType.RIGHT, spacing:{after:80}, children:[new D.PageBreak(), rtl('נספח – לו"ז מקביל',{bold:true,size:24,underline:{},color:ACCENT})]}));
     children.push(par);
   }
   const pal=appendixDocx("palsam");
   if(pal){
-    children.push(new D.Paragraph({pageBreakBefore:true, bidirectional:true, alignment:D.AlignmentType.RIGHT, spacing:{after:80}, children:[rtl('נספח – לו"ז פלס"ם',{bold:true,size:24,underline:{},color:ACCENT})]}));
+    children.push(new D.Paragraph({bidirectional:true, alignment:D.AlignmentType.RIGHT, spacing:{after:80}, children:[new D.PageBreak(), rtl('נספח – לו"ז פלס"ם',{bold:true,size:24,underline:{},color:ACCENT})]}));
     children.push(pal);
   }
   if(!children.length) children.push(P(rtl('לא נמצאו אירועי לו"ז בטווח שנבחר.',{size:22})));
@@ -1329,13 +1394,20 @@ async function exportDocx(){
   }
 
   /* ---- בניית המסמך (לו"ז A4 לאורך · דרישות לרוחב) ---- */
-  const doc = new D.Document({
+  return new D.Document({
     styles:{ default:{ document:{ run:{font:FONT,size:18,color:BODY} } } },
     sections
   });
+}
 
+async function buildDocxBlob(){ return await docx.Packer.toBlob(buildDocxDoc()); }
+
+async function exportDocx(){
+  if(typeof docx==="undefined"){ alert("ספריית יצירת ה-Word עדיין נטענת, נסה שוב."); return; }
+  $("exportState").textContent="בונה מסמך…";
   try{
-    const blob = await D.Packer.toBlob(doc);
+    const blob = await buildDocxBlob();
+    const battalion = $("battalion").value.trim() || "";
     const url = URL.createObjectURL(blob);
     const a=document.createElement("a");
     a.href=url; a.download="פקא לאימון גדוד "+(battalion||"")+".docx";
