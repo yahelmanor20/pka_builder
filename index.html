@@ -318,6 +318,7 @@
       <li>בחר יומן ושבוע → "משוך אירועים" → "צור והורד פק"א".</li>
     </ol>
     <div class="hint">החיבור דורש הרשאת קריאה בלבד ליומן (<code>calendar.readonly</code>). שום מידע אינו נשלח לשרת חיצוני — הכול רץ בדפדפן.</div>
+    <div class="hint"><b>צבעי אירועים ביומן:</b> אדום=פלוגה א' · כתום=ב' · צהוב=ג' · ירוק=ד' · ורוד=לו"ז מקביל · אפור=פלס"ם · <b>לבנדר=לא נכנס לפק"א כלל</b> (לשימוש לאירועים פנימיים שלא צריכים להופיע).</div>
     <details style="margin-top:10px">
       <summary>הגדרת מפתח (חד-פעמי, לא נדרש למפקצים)</summary>
       <ol class="steps" style="margin-top:8px">
@@ -371,10 +372,11 @@ $("clientId").addEventListener("change", e => {
 });
 
 /* ---------- מיפוי צבע אירוע (colorId) — מקור האמת לשיוך ---------- */
-/* אדום=א' · כתום=ב' · צהוב=ג' · ירוק=ד' · ורוד=לו"ז מקביל · אפור=פלס"ם.
+/* אדום=א' · כתום=ב' · צהוב=ג' · ירוק=ד' · ורוד=לו"ז מקביל · אפור=פלס"ם · לבנדר=לא נכנס לפק"א.
    הצבע גובר על טקסט הכותרת (כותרות לעיתים שגויות בימי סבב). */
 const COLOR_PLATOON = {"11":"א","6":"ב","5":"ג","10":"ד"};
 const COLOR_PARALLEL = "4", COLOR_PALSAM = "8";
+const COLOR_EXCLUDE = "1";   // לבנדר (Lavender) = לא נכנס לפק"א כלל
 
 /* ---------- זיהוי פעילות פלוגתית (#3) ---------- */
 /* סובלני לשגיאות מפקצים: "פלוגה א' - ...", "פל' ב –", "פלוגה ג:", בלי גרש, בלי מפריד */
@@ -551,9 +553,10 @@ function buildDays(items, start, nDays){
       p.date.getMonth()===sd.getMonth() &&
       p.date.getDate()===sd.getDate());
     if(idx<0) continue;
+    const colorId = ev.colorId || null;
+    if(colorId===COLOR_EXCLUDE) continue;   // לבנדר — לא נכנס לפק"א כלל
     const meta = parseDescription(ev.description);
     const summary = (ev.summary||"ללא כותרת").trim();
-    const colorId = ev.colorId || null;
 
     /* כלל #5: ורוד = לו"ז מקביל, אפור = פלס"ם → טבלה נפרדת בסוף.
        חריג: "מרחב חכם" נשאר תמיד בלו"ז הראשי */
