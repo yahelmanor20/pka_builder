@@ -91,6 +91,12 @@ window.addEventListener("load", function(){
   .tablescroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;touch-action:pan-x pan-y pinch-zoom;}
   .tablescroll table{margin:0;}
   .dayhead{background:var(--panel2);padding:9px 13px;font-weight:700;font-size:14px;color:#15202d;}
+  /* בלוק "דגשים ליום" — מתחת לטבלת הלו"ז */
+  .dayhl{background:var(--panel2);padding:8px 13px;border-top:1px solid var(--line);}
+  .dayhl-h{font-weight:700;font-size:13px;color:var(--accent);margin-bottom:4px;}
+  .dayhl ul{margin:0 14px 0 0;padding:0;list-style:disc;}
+  .dayhl li{font-size:13px;color:#15202d;margin:2px 0;}
+  [data-theme="dark"] .dayhl li{color:#e8eef5;}
   table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;}
   th,td{border:1px solid var(--line);padding:7px 9px;text-align:right;vertical-align:top;}
   th{background:#e9eff6;color:#3a4754;font-weight:700;}
@@ -530,7 +536,8 @@ function buildDays(items, start, nDays){
       track: track,
       location: (ev.location||meta.locOverride||mealLoc||"").trim() || UNKNOWN_LOC,
       giver: meta.giver||"",
-      notes: notes
+      notes: notes,
+      userNote: meta.notes||""   // הערת המשתמש הגולמית (ללא הערת סתירת-פלוגה) — לבלוק "דגשים ליום"
     };
     obj.timeRange = obj.start ? (obj.start + (obj.end ? "-"+obj.end : "")) : "";  // כלל #1
     obj.issues = computeIssues(obj);
@@ -556,6 +563,22 @@ function isAnchor(e){
 }
 function startKey(e){ return e.start || "99:99"; }
 function inlineParallelOn(){ return !!($("inlineParallel")||{}).checked; }
+
+/* ---- "דגשים ליום": אות סידורית ליום אימון + צבירת הערות אירועי היום ---- */
+const HL_LETTERS = ["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","ז׳"];
+/* אוסף את הערות המשתמש מכל אירועי היום → רשימת bullets ייחודית בפורמט "פעילות — הערה" */
+function buildDayHighlights(day){
+  const seen=new Set(), out=[];
+  for(const e of day.events){
+    const note=(e.userNote||"").trim();
+    if(!note) continue;
+    const act=(e.cleanSummary||"").replace(/\s*\(.*$/,"").trim();   // מקצר פירוט בסוגריים
+    const line = act ? (act+" — "+note) : note;
+    if(seen.has(line)) continue;     // דה-דופ
+    seen.add(line); out.push(line);
+  }
+  return out;
+}
 
 function buildDayRows(day){
   /* אירועי "כל היום" (ללא שעה) לא נכללים בלו"ז המיוצא */
@@ -721,11 +744,20 @@ function renderPreview(){
   else       { bar.className="reviewbar clean"; bar.textContent='✓ כל פעילויות הלו"ז זוהו.'; }
   host.appendChild(bar);
 
+  let dayN=0;
   for(const day of parsedDays){
     if(!day.events.some(e=>e.track==="main")) continue;
     const box=document.createElement("div"); box.className="daybox";
     box.appendChild(scrollWrap(renderLuzTable(day)));
+    const hl=buildDayHighlights(day);
+    if(hl.length){
+      const hb=document.createElement("div"); hb.className="dayhl";
+      hb.innerHTML=`<div class="dayhl-h">דגשים ליום ${esc(HL_LETTERS[dayN]||"")}</div><ul>`+
+        hl.map(t=>`<li>${esc(t)}</li>`).join("")+`</ul>`;
+      box.appendChild(hb);
+    }
     host.appendChild(box);
+    dayN++;
   }
 
   appendix("parallel",'נספח – לו"ז מקביל','ורוד');
@@ -1039,11 +1071,24 @@ async function exportDocx(){
     children.push(principleTableDocx(principle));
     first=false;   // הלו"ז היומי הראשון יתחיל בעמוד חדש
   }
+  let dayIdx=0;
   for(const day of parsedDays){
     if(!day.events.some(e=>e.track==="main")) continue;
     if(!first) children.push(new D.Paragraph({pageBreakBefore:true, children:[]}));
     first=false;
     children.push(luzTableDocx(day));
+    /* בלוק "דגשים ליום" — מתחת לטבלה, באותו עמוד (keepNext מונע גלישה/יתום) */
+    const hl=buildDayHighlights(day);
+    if(hl.length){
+      children.push(new D.Paragraph({bidirectional:true, alignment:D.AlignmentType.RIGHT,
+        spacing:{before:80,after:40}, keepLines:true, keepNext:true,
+        children:[rtl("דגשים ליום "+(HL_LETTERS[dayIdx]||""),{bold:true,size:20,color:ACCENT})]}));
+      hl.forEach((t,j)=> children.push(new D.Paragraph({bidirectional:true,
+        alignment:D.AlignmentType.RIGHT, spacing:{after:20}, keepLines:true,
+        keepNext: j<hl.length-1,
+        children:[rtl("• "+t,{size:16})]})));
+    }
+    dayIdx++;
   }
 
   const par=appendixDocx("parallel");
