@@ -664,6 +664,12 @@ function buildDays(items, start, nDays){
     const meta = parseDescription(ev.description);
     const summary = (ev.summary||"ללא כותרת").trim();
 
+    /* גורם מעביר בכותרת בסוגריים: "פעילות (גורם מעביר)" → הסוגריים בסוף = גורם, ומנוקים מהפעילות */
+    let titleGiver = "";
+    let summaryClean = summary;
+    const gm = summary.match(/\s*\(([^)]+)\)\s*$/);
+    if(gm){ titleGiver = gm[1].trim(); summaryClean = summary.slice(0, gm.index).trim() || summary; }
+
     /* כלל #5: ורוד = לו"ז מקביל, אפור = פלס"ם → טבלה נפרדת בסוף.
        חריג: "מרחב חכם" נשאר תמיד בלו"ז הראשי */
     let track = "main";
@@ -673,7 +679,7 @@ function buildDays(items, start, nDays){
     }
 
     /* שיוך פלוגה: צבע קודם, כותרת כגיבוי בלבד */
-    const titlePl = detectPlatoon(summary);
+    const titlePl = detectPlatoon(summaryClean);
     const colorPl = COLOR_PLATOON[colorId] || null;
     const platoon = track==="main" ? (colorPl || (titlePl ? titlePl.letter : null)) : null;
 
@@ -683,12 +689,12 @@ function buildDays(items, start, nDays){
       notes = (notes?notes+" · ":"") + "בכותרת נכתב: פלוגה "+titlePl.letter+"' (שויך לפי צבע)";
 
     /* ארוחות: "א.ב/א.צ/א.ע - חד"א|משיכה" → הטקסט שאחרי המקף הוא המיקום */
-    const meal = summary.match(/^\s*(א\.?[בצע])\s*[-–—]\s*(.+?)\s*$/);
+    const meal = summaryClean.match(/^\s*(א\.?[בצע])\s*[-–—]\s*(.+?)\s*$/);
     const mealLoc = meal ? meal[2].trim() : "";
 
     /* כלל #4: טכניקות/תרגולות — מצרפים את כל טקסט התיאור לפעילות */
-    let cleanSummary = (titlePl && titlePl.activity) ? titlePl.activity : (meal ? meal[1] : summary);
-    if(/טכניק|תרגול/.test(summary+" "+(ev.description||"")) && ev.description){
+    let cleanSummary = (titlePl && titlePl.activity) ? titlePl.activity : (meal ? meal[1] : summaryClean);
+    if(/טכניק|תרגול/.test(summaryClean+" "+(ev.description||"")) && ev.description){
       const full = ev.description.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).join(" · ");
       if(full) cleanSummary += " ("+full+")";
     }
@@ -702,7 +708,7 @@ function buildDays(items, start, nDays){
       colorId: colorId,
       track: track,
       location: (ev.location||meta.locOverride||mealLoc||"").trim() || UNKNOWN_LOC,
-      giver: meta.giver||"",
+      giver: titleGiver||meta.giver||"",
       notes: notes,
       userNote: meta.notes||""   // הערת המשתמש הגולמית (ללא הערת סתירת-פלוגה) — לבלוק "דגשים ליום"
     };
