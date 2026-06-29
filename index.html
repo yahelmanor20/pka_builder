@@ -5,6 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
 <title>מחולל פק"א מגוגל קלנדר</title>
 
+<!-- PWA: התקנה למסך הבית -->
+<link rel="manifest" href="./manifest.webmanifest" />
+<meta name="theme-color" content="#6c2a2a" />
+<link rel="icon" href="./icon.svg" type="image/svg+xml" />
+<link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png" />
+<link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="מחולל פק&quot;א" />
+
 <!-- Google Identity Services (OAuth) -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <!-- ספריות מסמכים. סדר טעינה חשוב: docx-preview דורס global `docx`, לכן שומרים ומשחזרים. -->
@@ -353,7 +364,7 @@ let _zoomResizeBound = false;
 function bindZoomResize(){
   if(_zoomResizeBound) return; _zoomResizeBound = true;
   let raf = 0;
-  const on = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(()=> zoomInstances.forEach(i=>i.fit())); };
+  const on = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(()=> zoomInstances.forEach(i=>i.reflow())); };
   window.addEventListener("resize", on);
   window.addEventListener("orientationchange", on);
 }
@@ -441,8 +452,18 @@ function zoomWrap(el){
   bFit.addEventListener("click",fit);
   stage.addEventListener("dblclick",e=>{ e.preventDefault(); if(s>1.05) fit(); else zoomBy(2); });
 
-  const api={fit}; zoomInstances.add(api);
-  requestAnimationFrame(fit);
+  /* תצוגת ברירת-מחדל: גודל טבעי קריא (לא מכווצים), ממורכז אם נכנס / מיושר לימין (תחילת RTL) אם רחב */
+  function initView(){
+    if(!clip.isConnected){ zoomInstances.delete(api); return; }
+    const wrapW=clip.clientWidth;
+    if(!wrapW){ requestAnimationFrame(initView); return; }
+    measure();
+    s=1;
+    tx = natW<=wrapW ? (wrapW-natW)/2 : (wrapW-natW);
+    ty=0; applyTransform();
+  }
+  const api={fit, reflow:applyTransform}; zoomInstances.add(api);
+  requestAnimationFrame(initView);
   return wrap;
 }
 const HE_DAYS = ["יום א'","יום ב'","יום ג'","יום ד'","יום ה'","יום ו'","שבת"];
@@ -1532,6 +1553,124 @@ async function exportDocx(){
     $("exportState").textContent='הפק"א (לו"ז + דרישות) הופק והורד ✓';
   }catch(e){ $("exportState").textContent="שגיאה ביצירת הקובץ: "+e.message; }
 }
+</script>
+
+<!-- ===== PWA: רישום service worker + חלון "הוסף למסך הבית" ===== -->
+<script>
+(function(){
+  "use strict";
+  /* רישום ה-SW בנתיב יחסי (חשוב — האתר מוגש מתת-נתיב /pka_builder/) */
+  if("serviceWorker" in navigator){
+    window.addEventListener("load", function(){
+      navigator.serviceWorker.register("./sw.js").catch(function(){});
+    });
+  }
+
+  var KEY = "pka_a2hs_dismissed";
+  function isInstalled(){
+    return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)
+        || window.navigator.standalone === true;
+  }
+  /* אם כבר מותקן — לא שואלים שוב. אם המשתמש כבר סגר פעם — לא מציקים שוב. */
+  if(isInstalled()) return;
+  try{ if(localStorage.getItem(KEY) === "1") return; }catch(e){}
+
+  function dismiss(){ try{ localStorage.setItem(KEY,"1"); }catch(e){} }
+
+  var deferred = null, sheet = null;
+
+  function injectStyles(){
+    if(document.getElementById("a2hs-style")) return;
+    var s = document.createElement("style"); s.id = "a2hs-style";
+    s.textContent =
+      ".a2hs-ovl{position:fixed;inset:0;background:rgba(15,22,30,.55);z-index:99999;display:flex;align-items:flex-end;justify-content:center;opacity:0;transition:opacity .2s}"+
+      ".a2hs-ovl.show{opacity:1}"+
+      ".a2hs-card{background:#fff;color:#1c2733;width:100%;max-width:460px;border-radius:18px 18px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -8px 30px rgba(0,0,0,.25);transform:translateY(100%);transition:transform .25s;font-family:'Segoe UI',Arial,'David',sans-serif;direction:rtl;text-align:right}"+
+      ".a2hs-ovl.show .a2hs-card{transform:translateY(0)}"+
+      "@media(min-width:560px){.a2hs-ovl{align-items:center}.a2hs-card{border-radius:18px}}"+
+      ".a2hs-top{display:flex;align-items:center;gap:12px;margin-bottom:10px}"+
+      ".a2hs-ico{width:54px;height:54px;border-radius:13px;flex:0 0 auto;box-shadow:0 2px 8px rgba(0,0,0,.18)}"+
+      ".a2hs-ttl{font-size:18px;font-weight:800;line-height:1.25;min-width:0}"+
+      ".a2hs-txt{font-size:14px;color:#5d6b7a;line-height:1.5;margin:2px 0 14px}"+
+      ".a2hs-row{display:flex;gap:10px;justify-content:flex-start}"+
+      ".a2hs-btn{border:0;border-radius:10px;padding:11px 18px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}"+
+      ".a2hs-primary{background:#e07b1a;color:#fff}"+
+      ".a2hs-ghost{background:#eef3f9;color:#1c2733}"+
+      ".a2hs-share{display:inline-block;vertical-align:-4px}";
+    document.head.appendChild(s);
+  }
+
+  function close(){
+    if(!sheet) return;
+    sheet.classList.remove("show");
+    var el = sheet; sheet = null;
+    setTimeout(function(){ if(el && el.parentNode) el.parentNode.removeChild(el); }, 260);
+  }
+
+  function buildSheet(title, html, buttons){
+    injectStyles();
+    var ovl = document.createElement("div"); ovl.className = "a2hs-ovl";
+    var card = document.createElement("div"); card.className = "a2hs-card";
+    var top = document.createElement("div"); top.className = "a2hs-top";
+    top.innerHTML = '<img class="a2hs-ico" src="./icon-192.png" alt="" /><div class="a2hs-ttl">'+title+'</div>';
+    var txt = document.createElement("div"); txt.className = "a2hs-txt"; txt.innerHTML = html;
+    var row = document.createElement("div"); row.className = "a2hs-row";
+    buttons.forEach(function(b){
+      var btn = document.createElement("button");
+      btn.className = "a2hs-btn " + (b.primary ? "a2hs-primary" : "a2hs-ghost");
+      btn.textContent = b.label; btn.type = "button";
+      btn.addEventListener("click", b.onClick);
+      row.appendChild(btn);
+    });
+    card.appendChild(top); card.appendChild(txt); card.appendChild(row);
+    ovl.appendChild(card);
+    ovl.addEventListener("click", function(e){ if(e.target === ovl){ dismiss(); close(); } });
+    document.body.appendChild(ovl);
+    sheet = ovl;
+    requestAnimationFrame(function(){ ovl.classList.add("show"); });
+  }
+
+  /* Android / דפדפנים תומכים: החלון מופיע כשהדפדפן מאשר שניתן להתקין */
+  window.addEventListener("beforeinstallprompt", function(e){
+    e.preventDefault();
+    deferred = e;
+    if(isInstalled() || sheet) return;
+    buildSheet(
+      'להוסיף את "מחולל פק״א" למסך הבית?',
+      'גישה מהירה בלחיצה אחת, כמו אפליקציה — בלי לפתוח דפדפן ולחפש כתובת.',
+      [
+        { label: "הוסף", primary: true, onClick: async function(){
+            close();
+            if(!deferred) return;
+            deferred.prompt();
+            try{ await deferred.userChoice; }catch(_){}
+            dismiss(); deferred = null;
+          } },
+        { label: "לא עכשיו", onClick: function(){ dismiss(); close(); } }
+      ]
+    );
+  });
+
+  window.addEventListener("appinstalled", function(){ dismiss(); close(); });
+
+  /* iOS / iPadOS — אין beforeinstallprompt, מציגים הוראות ידניות (Safari) */
+  var ua = navigator.userAgent || "";
+  var isIOS = (/iphone|ipad|ipod/i.test(ua)) ||
+              (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if(isIOS && !isInstalled()){
+    window.addEventListener("load", function(){
+      setTimeout(function(){
+        if(isInstalled() || sheet) return;
+        var share = '<svg class="a2hs-share" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1f7fc4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>';
+        buildSheet(
+          'להוספה למסך הבית',
+          'הקש על כפתור השיתוף '+share+' בתחתית הדפדפן, ואז בחר <b>"הוסף למסך הבית"</b>.',
+          [ { label: "הבנתי", primary: true, onClick: function(){ dismiss(); close(); } } ]
+        );
+      }, 1800);
+    });
+  }
+})();
 </script>
 </body>
 </html>
